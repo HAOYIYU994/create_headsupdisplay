@@ -1,0 +1,35 @@
+{
+  "itemGroup.create_headsupdisplay": "Create Heads Up Display",
+
+  "item.create_headsupdisplay.head_mount_display": "Head Mount Display",
+  "block.create_headsupdisplay.display_terminal": "Display Terminal",
+
+  "message.create_headsupdisplay.bound": "Glasses bound to terminal",
+
+  "gui.create_headsupdisplay.display_terminal.delete_slot": "Delete Slot",
+  "gui.create_headsupdisplay.display_terminal.color_picker": "Color Picker",
+  "gui.create_headsupdisplay.display_terminal.position": "Position",
+  "gui.create_headsupdisplay.display_terminal.scale": "Scale",
+  "gui.create_headsupdisplay.display_terminal.rotation": "Rotation",
+  "gui.create_headsupdisplay.display_terminal.opacity": "Opacity",
+
+  "gui.create_headsupdisplay.display_terminal.title": "Display Terminal Configuration",
+  "gui.create_headsupdisplay.display_terminal.reset_layout": "Reset Layout",
+  "gui.create_headsupdisplay.display_terminal.save": "Save",
+  "gui.create_headsupdisplay.display_terminal.add_static_text": "Add Text",
+  "gui.create_headsupdisplay.display_terminal.text_placeholder": "Text",
+  "gui.create_headsupdisplay.display_terminal.delete_button": "X",
+  "gui.create_headsupdisplay.display_terminal.rotation_prefix": "R:%d°",
+  "gui.create_headsupdisplay.display_terminal.color_picker.title": "Edit Color",
+  "gui.create_headsupdisplay.display_terminal.color_picker.subtitle": "Edit Color & Transparency",
+  "gui.create_headsupdisplay.display_terminal.color_picker.hex_hint": "HEX",
+  "gui.create_headsupdisplay.display_terminal.alpha": "Alpha: %d",
+  "gui.create_headsupdisplay.display_terminal.confirm": "Confirm",
+
+  "tooltip.create_headsupdisplay.hold_shift": "Hold %s for more information",
+  "tooltip.create_headsupdisplay.head_mount_display.line1": "§8» §7Allows you to view information from a linked Display Terminal",
+  "tooltip.create_headsupdisplay.head_mount_display.line2": "§8» §7Right-click+shift on a Display Terminal to link",
+  "tooltip.create_headsupdisplay.head_mount_display.line3": "§8» §7Supports customizable HUD layouts",
+
+  "hud.create_headsupdisplay.progress": "%d%%"
+}

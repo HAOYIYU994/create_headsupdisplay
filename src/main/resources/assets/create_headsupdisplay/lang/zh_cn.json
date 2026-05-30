@@ -1,0 +1,35 @@
+{
+  "itemGroup.create_headsupdisplay": "机械动力：头戴显示器",
+
+  "item.create_headsupdisplay.head_mount_display": "头戴显示器",
+  "block.create_headsupdisplay.display_terminal": "显示终端",
+
+  "message.create_headsupdisplay.bound": "护目镜已绑定到终端",
+
+  "gui.create_headsupdisplay.display_terminal.delete_slot": "删除槽位",
+  "gui.create_headsupdisplay.display_terminal.color_picker": "颜色选择器",
+  "gui.create_headsupdisplay.display_terminal.position": "位置",
+  "gui.create_headsupdisplay.display_terminal.scale": "缩放",
+  "gui.create_headsupdisplay.display_terminal.rotation": "旋转",
+  "gui.create_headsupdisplay.display_terminal.opacity": "透明度",
+
+  "gui.create_headsupdisplay.display_terminal.title": "显示终端配置",
+  "gui.create_headsupdisplay.display_terminal.reset_layout": "重置布局",
+  "gui.create_headsupdisplay.display_terminal.save": "保存",
+  "gui.create_headsupdisplay.display_terminal.add_static_text": "添加文本",
+  "gui.create_headsupdisplay.display_terminal.text_placeholder": "文本",
+  "gui.create_headsupdisplay.display_terminal.delete_button": "x",
+  "gui.create_headsupdisplay.display_terminal.rotation_prefix": "旋转：%d°",
+  "gui.create_headsupdisplay.display_terminal.color_picker.title": "编辑颜色",
+  "gui.create_headsupdisplay.display_terminal.color_picker.subtitle": "编辑颜色与透明度",
+  "gui.create_headsupdisplay.display_terminal.color_picker.hex_hint": "十六进制",
+  "gui.create_headsupdisplay.display_terminal.alpha": "透明度：%d",
+  "gui.create_headsupdisplay.display_terminal.confirm": "确认",
+
+  "tooltip.create_headsupdisplay.hold_shift": "按住 %s 以获取更多信息",
+  "tooltip.create_headsupdisplay.head_mount_display.line1": "§8» §7允许你查看已绑定显示终端的信息",
+  "tooltip.create_headsupdisplay.head_mount_display.line2": "§8» §7shift+右键点击显示终端以绑定",
+  "tooltip.create_headsupdisplay.head_mount_display.line3": "§8» §7支持可定制的HUD布局",
+
+  "hud.create_headsupdisplay.progress": "%d%%"
+}
