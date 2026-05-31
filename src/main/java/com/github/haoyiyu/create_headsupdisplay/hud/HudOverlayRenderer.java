@@ -37,9 +37,10 @@ public class HudOverlayRenderer {
 
                 int textColor = (slot.alpha << 24) | (slot.color & 0x00FFFFFF);
 
+                String text = slot.text.replaceAll("§[0-9a-fk-or]", "");
                 if (slot.displayLine == 2) {
                     // 进度条模式
-                    String[] parts = slot.text.split("/");
+                    String[] parts = text.split("/");
                     if (parts.length == 2) {
                         try {
                             int current = Integer.parseInt(parts[0].trim());
@@ -51,21 +52,21 @@ public class HudOverlayRenderer {
                                 graphics.fill(0, 0, barWidth, barHeight, 0xFF333333);
                                 int fillWidth = (int)(barWidth * percent);
                                 graphics.fill(0, 0, fillWidth, barHeight, 0xFF00FF00);
-                                String text = current + "/" + max;
-                                int textWidth = font.width(text);
-                                graphics.drawString(font, text, (barWidth - textWidth) / 2, barHeight + 2, textColor, true);
+                                String display = current + "/" + max;
+                                int textWidth = font.width(display);
+                                graphics.drawString(font, display, (barWidth - textWidth) / 2, barHeight + 2, textColor, true);
                             } else {
-                                graphics.drawString(font, slot.text, 0, 0, textColor, true);
+                                graphics.drawString(font, text, 0, 0, textColor, true);
                             }
                         } catch (NumberFormatException e) {
-                            graphics.drawString(font, slot.text, 0, 0, textColor, true);
+                            graphics.drawString(font, text, 0, 0, textColor, true);
                         }
                     } else {
-                        graphics.drawString(font, slot.text, 0, 0, textColor, true);
+                        graphics.drawString(font, text, 0, 0, textColor, true);
                     }
                 } else {
                     // 纯文本模式
-                    graphics.drawString(font, slot.text, 0, 0, textColor, true);
+                    graphics.drawString(font, text, 0, 0, textColor, true);
                 }
 
                 graphics.pose().popPose();
@@ -82,7 +83,7 @@ public class HudOverlayRenderer {
                 graphics.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(slot.rotation));
                 // 合成 ARGB 颜色
                 int argb = (slot.alpha << 24) | (slot.color & 0x00FFFFFF);
-                graphics.drawString(font, slot.text, 0, 0, argb, false);
+                graphics.drawString(font, slot.text.replaceAll("§[0-9a-fk-or]", ""), 0, 0, argb, false);
                 graphics.pose().popPose();
             }
         }

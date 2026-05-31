@@ -3,8 +3,30 @@
 
   "item.create_headsupdisplay.head_mount_display": "头戴显示器",
   "block.create_headsupdisplay.display_terminal": "显示终端",
+  "block.create_headsupdisplay.omni_core": "万物互联核心",
+  "block.create_headsupdisplay.link_block": "链接方块",
 
   "message.create_headsupdisplay.bound": "护目镜已绑定到终端",
+  "message.create_headsupdisplay.bind_mode": "右键点击显示终端以绑定",
+  "message.create_headsupdisplay.link_set": "已连接到位于 %s 的万物互联核心",
+  "message.create_headsupdisplay.link_clear": "已清除连接的万物互联核心",
+  "message.create_headsupdisplay.link_success": "终端已绑定到万物互联核心",
+  "message.create_headsupdisplay.source_sent": "信号源已发送到终端",
+
+  "gui.create_headsupdisplay.omni_core.title": "万物互联核心",
+  "gui.create_headsupdisplay.add_source": "添加信号源",
+  "gui.create_headsupdisplay.signal_sources": "信号源",
+  "gui.create_headsupdisplay.signal_name": "信号名称",
+  "gui.create_headsupdisplay.send": "发送",
+  "gui.create_headsupdisplay.delete": "删除",
+  "gui.create_headsupdisplay.back": "返回",
+  "gui.create_headsupdisplay.sort_on": "置顶: 开",
+  "gui.create_headsupdisplay.sort_off": "置顶: 关",
+  "gui.create_headsupdisplay.bind_terminal": "绑定终端",
+
+  "gui.create_headsupdisplay.add": "添加",
+  "gui.create_headsupdisplay.frequency_slot.1": "频率 1",
+  "gui.create_headsupdisplay.frequency_slot.2": "频率 2",
 
   "gui.create_headsupdisplay.display_terminal.delete_slot": "删除槽位",
   "gui.create_headsupdisplay.display_terminal.color_picker": "颜色选择器",
@@ -12,7 +34,6 @@
   "gui.create_headsupdisplay.display_terminal.scale": "缩放",
   "gui.create_headsupdisplay.display_terminal.rotation": "旋转",
   "gui.create_headsupdisplay.display_terminal.opacity": "透明度",
-
   "gui.create_headsupdisplay.display_terminal.title": "显示终端配置",
   "gui.create_headsupdisplay.display_terminal.reset_layout": "重置布局",
   "gui.create_headsupdisplay.display_terminal.save": "保存",

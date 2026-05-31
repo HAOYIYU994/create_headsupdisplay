@@ -1,8 +1,10 @@
 package com.github.haoyiyu.create_headsupdisplay;
 
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalTarget;
+import com.github.haoyiyu.create_headsupdisplay.block.OmniCoreDisplayTarget;
 import com.github.haoyiyu.create_headsupdisplay.client.HeadMountDisplayClient;
 import com.github.haoyiyu.create_headsupdisplay.menu.DisplayTerminalScreen;
+import com.github.haoyiyu.create_headsupdisplay.screen.FrequencySelectionScreen;
 import com.github.haoyiyu.create_headsupdisplay.registration.*;
 import com.simibubi.create.api.behaviour.display.DisplayTarget;
 import net.minecraft.client.Minecraft;
@@ -35,7 +37,6 @@ public class CreateHeadsUpDisplay {
         ModDataComponents.register(modBus);
         ModMenus.register(modBus);
         ModCreativeTabs.CREATIVE_MODE_TABS.register(modBus);
-
         modBus.addListener(this::commonSetup);
         if (FMLEnvironment.dist == Dist.CLIENT) {
             modBus.addListener(this::clientSetup);
@@ -48,6 +49,7 @@ public class CreateHeadsUpDisplay {
     private void commonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
             DisplayTarget.BY_BLOCK.register(ModBlocks.DISPLAY_TERMINAL.get(), new DisplayTerminalTarget());
+            DisplayTarget.BY_BLOCK.register(ModBlocks.OMNI_CORE.get(), new OmniCoreDisplayTarget());
         });
     }
 
@@ -81,6 +83,7 @@ public class CreateHeadsUpDisplay {
         @SubscribeEvent
         public static void onRegisterScreens(RegisterMenuScreensEvent event) {
             event.register(ModMenus.DISPLAY_TERMINAL_MENU.get(), DisplayTerminalScreen::new);
+            event.register(ModMenus.FREQUENCY_SELECTION_MENU.get(), FrequencySelectionScreen::new);
         }
 
         @SubscribeEvent

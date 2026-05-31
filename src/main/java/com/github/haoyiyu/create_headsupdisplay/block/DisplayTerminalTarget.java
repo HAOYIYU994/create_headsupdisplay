@@ -24,7 +24,11 @@ public class DisplayTerminalTarget extends DisplayTarget {
             sb.append(component.getString());
             sb.append(" ");
         }
-        String fullText = sb.toString().trim();
+        String fullText = sb.toString().trim().replaceAll("§[0-9a-fk-or]", "");
+        int firstSpace = fullText.indexOf(' ');
+        if (firstSpace > 0) {
+            fullText = fullText.substring(firstSpace + 1);
+        }
 
         // 更新槽位数据和样式（行号）
         terminal.updateSlotDataAndStyle(sourcePos, fullText, line);

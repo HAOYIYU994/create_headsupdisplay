@@ -3,8 +3,30 @@
 
   "item.create_headsupdisplay.head_mount_display": "Head Mount Display",
   "block.create_headsupdisplay.display_terminal": "Display Terminal",
+  "block.create_headsupdisplay.omni_core": "Omni Core",
+  "block.create_headsupdisplay.link_block": "Link Block",
 
   "message.create_headsupdisplay.bound": "Glasses bound to terminal",
+  "message.create_headsupdisplay.bind_mode": "Right-click a Display Terminal to bind",
+  "message.create_headsupdisplay.link_set": "Linked to Omni Core at %s",
+  "message.create_headsupdisplay.link_clear": "Cleared linked Omni Core",
+  "message.create_headsupdisplay.link_success": "Bound terminal to Omni Core",
+  "message.create_headsupdisplay.source_sent": "Source sent to terminal",
+
+  "gui.create_headsupdisplay.omni_core.title": "Omni Core",
+  "gui.create_headsupdisplay.add_source": "Add Source",
+  "gui.create_headsupdisplay.signal_sources": "Signal Sources",
+  "gui.create_headsupdisplay.signal_name": "Signal Name",
+  "gui.create_headsupdisplay.send": "Send",
+  "gui.create_headsupdisplay.delete": "Del",
+  "gui.create_headsupdisplay.back": "Back",
+  "gui.create_headsupdisplay.sort_on": "Sort: ON",
+  "gui.create_headsupdisplay.sort_off": "Sort: OFF",
+  "gui.create_headsupdisplay.bind_terminal": "Bind Terminal",
+
+  "gui.create_headsupdisplay.add": "Add",
+  "gui.create_headsupdisplay.frequency_slot.1": "Freq. 1",
+  "gui.create_headsupdisplay.frequency_slot.2": "Freq. 2",
 
   "gui.create_headsupdisplay.display_terminal.delete_slot": "Delete Slot",
   "gui.create_headsupdisplay.display_terminal.color_picker": "Color Picker",
@@ -12,7 +34,6 @@
   "gui.create_headsupdisplay.display_terminal.scale": "Scale",
   "gui.create_headsupdisplay.display_terminal.rotation": "Rotation",
   "gui.create_headsupdisplay.display_terminal.opacity": "Opacity",
-
   "gui.create_headsupdisplay.display_terminal.title": "Display Terminal Configuration",
   "gui.create_headsupdisplay.display_terminal.reset_layout": "Reset Layout",
   "gui.create_headsupdisplay.display_terminal.save": "Save",

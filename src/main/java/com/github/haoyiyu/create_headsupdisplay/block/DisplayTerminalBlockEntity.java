@@ -46,14 +46,22 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
         return slots.computeIfAbsent(sourcePos, k -> new DisplaySlot(sourcePos));
     }
 
+    public DisplaySlot getSlot(BlockPos sourcePos) {
+        return slots.get(sourcePos);
+    }
+
     public void updateSlotData(BlockPos sourcePos, String text) {
+        updateSlotData(sourcePos, text, true);
+    }
+
+    /** @param sync 是否同步到 HUD 玩家（tick 更新时传 false 避免干扰终端编辑） */
+    public void updateSlotData(BlockPos sourcePos, String text, boolean sync) {
         DisplaySlot slot = getOrCreateSlot(sourcePos);
         slot.setLastData(text);
         setChanged();
-        syncToBoundPlayers();
+        if (sync) syncToBoundPlayers();
     }
 
-    // 修改：增加 rotation 参数
     public void updateSlotConfig(BlockPos sourcePos, int posX, int posY, float scale, float rotation, int color, int alpha) {
         DisplaySlot slot = getOrCreateSlot(sourcePos);
         slot.setPos(posX, posY);
@@ -66,9 +74,21 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
     }
 
     public void updateSlotDataAndStyle(BlockPos sourcePos, String text, int line) {
+        updateSlotDataAndStyle(sourcePos, text, line, null);
+    }
+
+    public void updateSlotDataAndStyle(BlockPos sourcePos, String text, int line, String sourceName) {
         DisplaySlot slot = getOrCreateSlot(sourcePos);
         slot.setLastData(text);
         slot.setDisplayLine(line);
+        if (sourceName != null) slot.setSourceName(sourceName);
+        setChanged();
+        syncToBoundPlayers();
+    }
+
+    public void updateSlotSourceName(BlockPos sourcePos, String name) {
+        DisplaySlot slot = getOrCreateSlot(sourcePos);
+        slot.setSourceName(name);
         setChanged();
         syncToBoundPlayers();
     }
@@ -130,6 +150,7 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
             data.putFloat("rotation", slot.getRotation());
             data.putInt("color", slot.getColor());
             data.putInt("alpha", slot.getAlpha());
+            if (slot.getSourceName() != null) data.putString("sourceName", slot.getSourceName());
             slotsData.add(data);
 
         }
@@ -195,6 +216,7 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
             slotTag.putFloat("rotation", slot.getRotation());
             slotTag.putInt("color", slot.getColor());
             slotTag.putInt("alpha", slot.getAlpha());
+            if (slot.getSourceName() != null) slotTag.putString("sourceName", slot.getSourceName());
             slotsTag.add(slotTag);
         }
         full.put("Slots", slotsTag);
@@ -245,6 +267,8 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
             st.putInt("posY", slot.getPosY());
             st.putFloat("scale", slot.getScale());
             st.putFloat("rotation", slot.getRotation());
+            st.putInt("color", slot.getColor());
+            st.putInt("alpha", slot.getAlpha());
             staticTag.add(st);
         }
         tag.put("StaticTexts", staticTag);

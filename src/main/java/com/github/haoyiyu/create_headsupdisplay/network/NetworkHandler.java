@@ -11,8 +11,15 @@ import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
 @EventBusSubscriber(bus = EventBusSubscriber.Bus.MOD)
 public class NetworkHandler {
+    private static boolean registered = false;
+
     @SubscribeEvent
     public static void register(final RegisterPayloadHandlersEvent event) {
+        if (registered) {
+            return;
+        }
+        registered = true;
+
         final PayloadRegistrar registrar = event.registrar("1");
 
         // 同步显示数据（服务端 -> 客户端）
@@ -22,7 +29,7 @@ public class NetworkHandler {
                 (payload, context) -> context.enqueueWork(() -> ClientHudData.updateDisplayData(payload.data()))
         );
 
-        // 打开配置屏幕（服务端 -> 客户端）
+        // 打开终端配置屏幕（服务端 -> 客户端）
         registrar.playToClient(
                 OpenTerminalConfigScreenPayload.TYPE,
                 OpenTerminalConfigScreenPayload.CODEC,
@@ -76,7 +83,6 @@ public class NetworkHandler {
                 })
         );
 
-        // 删除槽位（客户端 -> 服务端）
         registrar.playToServer(
                 RemoveSlotPayload.TYPE,
                 RemoveSlotPayload.CODEC,
@@ -87,5 +93,78 @@ public class NetworkHandler {
                     }
                 })
         );
+
+        // ========== 万物互联核心网络包 ==========
+        // 打开核心配置屏幕（服务端 -> 客户端）
+        registrar.playToClient(
+                OpenOmniCoreScreenPayload.TYPE,
+                OpenOmniCoreScreenPayload.CODEC,
+                OpenOmniCoreScreenPayload::handle
+        );
+
+        // 添加红石信号源（客户端 -> 服务端）
+        registrar.playToServer(
+                AddRedstoneSourcePayload.TYPE,
+                AddRedstoneSourcePayload.CODEC,
+                AddRedstoneSourcePayload::handle
+        );
+
+        // 删除红石信号源（客户端 -> 服务端）
+        registrar.playToServer(
+                RemoveRedstoneSourcePayload.TYPE,
+                RemoveRedstoneSourcePayload.CODEC,
+                RemoveRedstoneSourcePayload::handle
+        );
+
+        // 发送信息源到终端（客户端 -> 服务端）
+        registrar.playToServer(
+                SendSourceToTerminalPayload.TYPE,
+                SendSourceToTerminalPayload.CODEC,
+                SendSourceToTerminalPayload::handle
+        );
+
+        // 请求核心数据（客户端 -> 服务端）
+        registrar.playToServer(
+                RequestSourcesDataPayload.TYPE,
+                RequestSourcesDataPayload.CODEC,
+                RequestSourcesDataPayload::handle
+        );
+
+        // 同步核心数据（服务端 -> 客户端）
+        registrar.playToClient(
+                SyncSourcesDataPayload.TYPE,
+                SyncSourcesDataPayload.CODEC,
+                SyncSourcesDataPayload::handle
+        );
+
+        // 切换自动置顶（客户端 -> 服务端）
+        registrar.playToServer(
+                ToggleAutoSortPayload.TYPE,
+                ToggleAutoSortPayload.CODEC,
+                ToggleAutoSortPayload::handle
+        );
+
+        // 更新转译配置（客户端 -> 服务端）
+        registrar.playToServer(
+                UpdateTranslationPayload.TYPE,
+                UpdateTranslationPayload.CODEC,
+                UpdateTranslationPayload::handle
+        );
+
+        // ========== 频率选择容器菜单包 ==========
+        // 请求打开频率选择界面（客户端 -> 服务端）
+        registrar.playToServer(
+                RequestOpenFrequencySelectionPayload.TYPE,
+                RequestOpenFrequencySelectionPayload.CODEC,
+                RequestOpenFrequencySelectionPayload::handle
+        );
+
+        // 打开频率选择界面（服务端 -> 客户端）
+        registrar.playToClient(
+                OpenFrequencySelectionPayload.TYPE,
+                OpenFrequencySelectionPayload.CODEC,
+                OpenFrequencySelectionPayload::handle
+        );
+
     }
 }

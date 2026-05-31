@@ -9,9 +9,10 @@ public class DisplaySlot {
     private float scale;
     private String lastData;
     private int displayLine;
-    private float rotation;      // 新增旋转
+    private float rotation;
     private int color = 0xFFFFFF;
     private int alpha = 255;
+    private String sourceName;  // 数据源名称（仅在终端编辑界面显示）
 
     public DisplaySlot(BlockPos sourcePos) {
         this.sourcePos = sourcePos;
@@ -23,7 +24,6 @@ public class DisplaySlot {
         this.rotation = 0f;
     }
 
-    // Getters
     public BlockPos getSourcePos() { return sourcePos; }
     public int getPosX() { return posX; }
     public int getPosY() { return posY; }
@@ -33,8 +33,8 @@ public class DisplaySlot {
     public float getRotation() { return rotation; }
     public int getColor() { return color; }
     public int getAlpha() { return alpha;}
+    public String getSourceName() { return sourceName; }
 
-        // Setters
     public void setPos(int x, int y) { this.posX = x; this.posY = y; }
     public void setScale(float scale) { this.scale = scale; }
     public void setLastData(String data) { this.lastData = data; }
@@ -42,6 +42,7 @@ public class DisplaySlot {
     public void setRotation(float rotation) { this.rotation = rotation; }
     public void setColor(int color) { this.color = color; }
     public void setAlpha(int alpha) { this.alpha = alpha; }
+    public void setSourceName(String name) { this.sourceName = name; }
 
     public CompoundTag serialize() {
         CompoundTag tag = new CompoundTag();
@@ -54,6 +55,7 @@ public class DisplaySlot {
         tag.putFloat("Rotation", rotation);
         tag.putInt("Color", color);
         tag.putInt("Alpha", alpha);
+        if (sourceName != null) tag.putString("SourceName", sourceName);
         return tag;
     }
 
@@ -68,6 +70,7 @@ public class DisplaySlot {
         slot.rotation = tag.getFloat("Rotation");
         slot.color = tag.getInt("Color");
         slot.alpha = tag.getInt("Alpha");
+        if (tag.contains("SourceName")) slot.sourceName = tag.getString("SourceName");
         return slot;
     }
 }

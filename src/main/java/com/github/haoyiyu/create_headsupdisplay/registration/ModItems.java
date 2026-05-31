@@ -2,8 +2,8 @@ package com.github.haoyiyu.create_headsupdisplay.registration;
 
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
 import com.github.haoyiyu.create_headsupdisplay.item.HeadMountDisplayItem;
-import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.ArmorMaterials;
+import com.github.haoyiyu.create_headsupdisplay.item.LinkBlockItem;
+import com.github.haoyiyu.create_headsupdisplay.item.OmniCoreItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -17,6 +17,13 @@ public class ModItems {
 
     public static final DeferredItem<BlockItem> DISPLAY_TERMINAL_ITEM = ITEMS.register("display_terminal",
             () -> new BlockItem(ModBlocks.DISPLAY_TERMINAL.get(), new Item.Properties()));
+
+    // 新增 OmniCore 物品
+    public static final DeferredItem<OmniCoreItem> OMNI_CORE_ITEM = ITEMS.register("omni_core",
+            () -> new OmniCoreItem(ModBlocks.OMNI_CORE.get(), new Item.Properties()));
+
+    public static final DeferredItem<LinkBlockItem> LINK_BLOCK_ITEM = ITEMS.register("link_block",
+            () -> new LinkBlockItem(new Item.Properties().stacksTo(64)));
 
     public static void register(net.neoforged.bus.api.IEventBus bus) {
         ITEMS.register(bus);

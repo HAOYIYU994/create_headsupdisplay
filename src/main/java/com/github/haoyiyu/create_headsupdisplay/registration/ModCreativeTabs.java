@@ -22,7 +22,8 @@ public class ModCreativeTabs {
                         // 添加模组的所有物品
                         output.accept(ModItems.HEAD_MOUNT_DISPLAY.get());
                         output.accept(ModItems.DISPLAY_TERMINAL_ITEM.get());
-                        // 如果以后有更多物品，继续添加
+                        output.accept(ModItems.OMNI_CORE_ITEM.get());
+                        output.accept(ModItems.LINK_BLOCK_ITEM.get());
                     })
                     .build()
     );

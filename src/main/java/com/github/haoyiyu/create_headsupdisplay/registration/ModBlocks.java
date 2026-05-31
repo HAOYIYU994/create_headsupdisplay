@@ -2,27 +2,29 @@ package com.github.haoyiyu.create_headsupdisplay.registration;
 
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlock;
-import net.minecraft.world.level.block.Blocks;
+import com.github.haoyiyu.create_headsupdisplay.block.LinkBlock;
+import com.github.haoyiyu.create_headsupdisplay.block.OmniCoreBlock;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockBehaviour;
+import net.minecraft.world.level.material.MapColor;
 import net.neoforged.neoforge.registries.DeferredBlock;
 import net.neoforged.neoforge.registries.DeferredRegister;
 
 public class ModBlocks {
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(CreateHeadsUpDisplay.MOD_ID);
 
-    static {
-        System.out.println("ModBlocks static init");
-    }
+    public static final DeferredBlock<DisplayTerminalBlock> DISPLAY_TERMINAL = BLOCKS.registerBlock("display_terminal",
+            DisplayTerminalBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).requiresCorrectToolForDrops());
 
-    public static final DeferredBlock<DisplayTerminalBlock> DISPLAY_TERMINAL = BLOCKS.register("display_terminal",
-            () -> {
-                System.out.println("Creating DisplayTerminalBlock instance");
-                return new DisplayTerminalBlock(BlockBehaviour.Properties.ofFullCopy(Blocks.IRON_BLOCK).noOcclusion());
-            });
+    // 新增：万物互联核心方块
+    public static final DeferredBlock<OmniCoreBlock> OMNI_CORE = BLOCKS.registerBlock("omni_core",
+            OmniCoreBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).strength(3.0f));
+
+    // 链接方块：连接 OmniCore 和 Display Terminal
+    public static final DeferredBlock<LinkBlock> LINK_BLOCK = BLOCKS.registerBlock("link_block",
+            LinkBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).noOcclusion());
 
     public static void register(net.neoforged.bus.api.IEventBus bus) {
         BLOCKS.register(bus);
-        System.out.println("ModBlocks.register called");
-        System.out.println("ModBlocks.register finished");
     }
 }

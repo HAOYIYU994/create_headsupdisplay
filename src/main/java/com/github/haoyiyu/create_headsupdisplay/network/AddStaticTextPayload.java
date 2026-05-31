@@ -9,7 +9,7 @@ import net.minecraft.resources.ResourceLocation;
 
 public record AddStaticTextPayload(BlockPos terminalPos, String text, int posX, int posY, float scale, float rotation, int color, int alpha) implements CustomPacketPayload {
     public static final Type<AddStaticTextPayload> TYPE = new Type<>(
-            ResourceLocation.fromNamespaceAndPath(CreateHeadsUpDisplay.MOD_ID, "add_static_text")
+            ResourceLocation.fromNamespaceAndPath(CreateHeadsUpDisplay.MOD_ID, "add_redstone_slot_to_core")
     );
     public static final StreamCodec<RegistryFriendlyByteBuf, AddStaticTextPayload> CODEC = StreamCodec.of(
             (buf, payload) -> {

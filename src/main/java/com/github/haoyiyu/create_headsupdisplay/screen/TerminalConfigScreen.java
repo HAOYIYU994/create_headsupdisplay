@@ -45,7 +45,8 @@ public class TerminalConfigScreen extends Screen {
             float rotation = slotTag.getFloat("rotation");
             int color = slotTag.getInt("color");
             int alpha = slotTag.getInt("alpha");
-            slots.add(new SlotEntry(sourcePos, posX, posY, scale, text, displayLine, rotation, color, alpha));
+            String sourceName = slotTag.contains("sourceName") ? slotTag.getString("sourceName") : null;
+            slots.add(new SlotEntry(sourcePos, posX, posY, scale, text, displayLine, rotation, color, alpha, sourceName));
         }
 
         ListTag staticTag = data.getList("StaticTexts", CompoundTag.TAG_COMPOUND);
@@ -164,6 +165,10 @@ public class TerminalConfigScreen extends Screen {
             int h = (int)(20 * slot.scale);
             graphics.fill(slot.posX, slot.posY, slot.posX + w, slot.posY + h, 0xAA333333);
             graphics.drawString(font, slot.text, slot.posX + 2, slot.posY + 2, 0xFFFFFF, false);
+            // 来源名称（显示在文本框下方）
+            if (slot.sourceName != null) {
+                graphics.drawString(font, slot.sourceName, slot.posX + 2, slot.posY + h + 2, 0xAAAAAA, false);
+            }
             // 删除按钮
             int delX = slot.posX + w - 12;
             int delY = slot.posY;
@@ -441,7 +446,8 @@ public class TerminalConfigScreen extends Screen {
         int displayLine;
         float rotation;
         int color, alpha;
-        SlotEntry(BlockPos sourcePos, int posX, int posY, float scale, String text, int displayLine, float rotation, int color, int alpha) {
+        String sourceName;
+        SlotEntry(BlockPos sourcePos, int posX, int posY, float scale, String text, int displayLine, float rotation, int color, int alpha, String sourceName) {
             this.sourcePos = sourcePos;
             this.posX = posX;
             this.posY = posY;
@@ -451,6 +457,7 @@ public class TerminalConfigScreen extends Screen {
             this.rotation = rotation;
             this.color = color;
             this.alpha = alpha;
+            this.sourceName = sourceName;
         }
     }
 

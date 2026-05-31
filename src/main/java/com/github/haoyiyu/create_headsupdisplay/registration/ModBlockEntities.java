@@ -2,18 +2,31 @@ package com.github.haoyiyu.create_headsupdisplay.registration;
 
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlockEntity;
-import net.minecraft.core.registries.BuiltInRegistries;
+import com.github.haoyiyu.create_headsupdisplay.block.LinkBlockEntity;
+import com.github.haoyiyu.create_headsupdisplay.block.OmniCoreBlockEntity;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.neoforged.neoforge.registries.DeferredHolder;
 import net.neoforged.neoforge.registries.DeferredRegister;
+
+import java.util.function.Supplier;
 
 public class ModBlockEntities {
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES =
-            DeferredRegister.create(BuiltInRegistries.BLOCK_ENTITY_TYPE, CreateHeadsUpDisplay.MOD_ID);
+            DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, CreateHeadsUpDisplay.MOD_ID);
 
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DisplayTerminalBlockEntity>> DISPLAY_TERMINAL_BE =
+    public static final Supplier<BlockEntityType<DisplayTerminalBlockEntity>> DISPLAY_TERMINAL_BE =
             BLOCK_ENTITIES.register("display_terminal_be",
-                    () -> BlockEntityType.Builder.of(DisplayTerminalBlockEntity::new, ModBlocks.DISPLAY_TERMINAL.get()).build(null));
+                    () -> BlockEntityType.Builder.of(DisplayTerminalBlockEntity::new,
+                            ModBlocks.DISPLAY_TERMINAL.get()).build(null));
+
+    // 使用 Supplier 统一风格，避免 DeferredHolder 导入问题
+    public static final Supplier<BlockEntityType<OmniCoreBlockEntity>> OMNI_CORE =
+            BLOCK_ENTITIES.register("omni_core", () -> BlockEntityType.Builder.of(OmniCoreBlockEntity::new,
+                    ModBlocks.OMNI_CORE.get()).build(null));
+
+    public static final Supplier<BlockEntityType<LinkBlockEntity>> LINK =
+            BLOCK_ENTITIES.register("link", () -> BlockEntityType.Builder.of(LinkBlockEntity::new,
+                    ModBlocks.LINK_BLOCK.get()).build(null));
 
     public static void register(net.neoforged.bus.api.IEventBus bus) {
         BLOCK_ENTITIES.register(bus);
