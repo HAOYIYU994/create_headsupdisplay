@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class OmniCoreBlockEntity extends BlockEntity {
     private boolean autoSortEnabled = true; // 自动置顶开关
@@ -56,6 +57,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
             ListTag sourcesTag = new ListTag();
             for (RedstoneSource src : sources) {
                 CompoundTag srcTag = new CompoundTag();
+                srcTag.putString("type", src.sourceType.name());
                 srcTag.putString("name", src.name);
                 srcTag.put("freqItem1", src.frequencyItem1.saveOptional(level.registryAccess()));
                 srcTag.put("freqItem2", src.frequencyItem2.saveOptional(level.registryAccess()));
@@ -66,6 +68,12 @@ public class OmniCoreBlockEntity extends BlockEntity {
                 if (src.translation != null && src.translation.getMode() != TranslationConfig.Mode.NONE) {
                     srcTag.put("translation", src.translation.serialize());
                 }
+                // IMAGE 字段
+                if (src.sourceType == RedstoneSource.Type.IMAGE) {
+                    srcTag.putUUID("ImageId", src.imageId);
+                    srcTag.putString("ImageFileName", src.imageFileName);
+                    srcTag.putByteArray("ImageData", src.imageData);
+                }
                 sourcesTag.add(srcTag);
             }
             data.put("Sources", sourcesTag);
@@ -75,6 +83,15 @@ public class OmniCoreBlockEntity extends BlockEntity {
 
     public void addRedstoneSource(String name, ItemStack frequencyItem1, ItemStack frequencyItem2) {
         sources.add(new RedstoneSource(name, frequencyItem1, frequencyItem2));
+        setChanged();
+    }
+
+    /** 添加一个 IMAGE 类型的图片源 */
+    public void addImageSource(UUID imageId, String fileName, byte[] imageData) {
+        if (imageData == null || imageData.length > 512 * 1024) return;
+        // 检查 PNG 头
+        if (imageData.length < 8) return;
+        sources.add(RedstoneSource.image(imageId, fileName, imageData));
         setChanged();
     }
 
@@ -99,10 +116,18 @@ public class OmniCoreBlockEntity extends BlockEntity {
         if (boundTerminalPos == null) return;
         BlockEntity be = level.getBlockEntity(boundTerminalPos);
         if (be instanceof DisplayTerminalBlockEntity terminal) {
-            BlockPos virtualPos = sentSources.get(sourceIndex);
-            if (virtualPos != null) {
-                terminal.removeSlot(virtualPos);
-                sentSources.remove(sourceIndex);
+            if (sourceIndex >= 0 && sourceIndex < sources.size()) {
+                RedstoneSource src = sources.get(sourceIndex);
+                if (src.sourceType == RedstoneSource.Type.IMAGE && src.imageId != null) {
+                    terminal.removeImageSlot(src.imageId);
+                    sentSources.remove(sourceIndex);
+                } else {
+                    BlockPos virtualPos = sentSources.get(sourceIndex);
+                    if (virtualPos != null) {
+                        terminal.removeSlot(virtualPos);
+                        sentSources.remove(sourceIndex);
+                    }
+                }
             }
         }
     }
@@ -132,6 +157,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
             }
         }
         RedstoneSource src = new RedstoneSource(name, ItemStack.EMPTY, ItemStack.EMPTY);
+        src.sourceType = RedstoneSource.Type.DISPLAY_LINK;
         src.displayLinkSourcePos = sourcePos;
         src.displayLinkText = text;
         sources.add(0, src);
@@ -148,16 +174,23 @@ public class OmniCoreBlockEntity extends BlockEntity {
     public SourceSnapshot getSource(int index) {
         RedstoneSource src = sources.get(index);
         int strength = getCurrentStrength(src);
-        String display = getDisplayText(src);
-        if (src.displayLinkSourcePos != null) {
-            return new SourceSnapshot(src.name, src.frequencyItem1, src.frequencyItem2, strength, display, src.displayLinkSourcePos);
+        // DisplayLink 源：用实际文本而非强度值；红石源：用转译后的文本
+        String display;
+        if (src.sourceType == RedstoneSource.Type.DISPLAY_LINK) {
+            display = src.displayLinkText != null ? src.displayLinkText : "0";
+        } else {
+            display = getDisplayText(src);
         }
-        return new SourceSnapshot(src.name, src.frequencyItem1, src.frequencyItem2, strength, display, null);
+        return new SourceSnapshot(src.name, src.frequencyItem1, src.frequencyItem2,
+                strength, display, src.displayLinkSourcePos,
+                src.sourceType.name(), src.imageId, src.imageFileName, src.imageData);
     }
 
     public record SourceSnapshot(String name, net.minecraft.world.item.ItemStack item1,
                                   net.minecraft.world.item.ItemStack item2, int strength,
-                                  String displayText, BlockPos displayLinkSourcePos) {}
+                                  String displayText, BlockPos displayLinkSourcePos,
+                                  String sourceType, UUID imageId,
+                                  String imageFileName, byte[] imageData) {}
 
     public void sendToTerminal(int sourceIndex) {
         if (boundTerminalPos == null) return;
@@ -166,6 +199,15 @@ public class OmniCoreBlockEntity extends BlockEntity {
         if (!(be instanceof DisplayTerminalBlockEntity terminal)) return;
 
         RedstoneSource src = sources.get(sourceIndex);
+
+        // IMAGE 类型：直接发送图片到终端图片槽位
+        if (src.sourceType == RedstoneSource.Type.IMAGE) {
+            terminal.addImageSlot(src.imageId, src.imageFileName, src.imageData);
+            sentSources.put(sourceIndex, new BlockPos(0, src.imageId.hashCode(), 0));
+            setChanged();
+            return;
+        }
+
         // 用源名称做稳定标识
         BlockPos virtualPos;
         if (src.displayLinkSourcePos != null) {
@@ -225,13 +267,20 @@ public class OmniCoreBlockEntity extends BlockEntity {
     public static void tick(Level level, BlockPos pos, BlockState state, OmniCoreBlockEntity be) {
         if (level.isClientSide) return;
 
-        // 第一步：检测所有红石源强度变化（不限已发送），变化时置顶（不需要绑定终端）
+        // 第一步：检测所有源的变化，变化时置顶（不需要绑定终端）
         for (int idx = 0; idx < be.sources.size(); idx++) {
             RedstoneSource src = be.sources.get(idx);
-            if (src.displayLinkSourcePos != null) continue; // 跳过 Display Link 源
-            int strength = RedstoneSignalHelper.getSignalStrength(level, src.frequencyItem1, src.frequencyItem2);
-            if (be.autoSortEnabled && strength != src.lastStrength) {
-                src.lastStrength = strength;
+            boolean changed = false;
+            if (src.sourceType == RedstoneSource.Type.REDSTONE) {
+                int strength = RedstoneSignalHelper.getSignalStrength(level, src.frequencyItem1, src.frequencyItem2);
+                if (be.autoSortEnabled && strength != src.lastStrength) {
+                    src.lastStrength = strength;
+                    changed = true;
+                }
+            } else if (src.sourceType == RedstoneSource.Type.DISPLAY_LINK) {
+                // DisplayLink 源在 addOrUpdateDisplayLinkSource 中已处理置顶
+            }
+            if (changed) {
                 be.moveToTop(idx);
                 break;
             }
@@ -256,8 +305,15 @@ public class OmniCoreBlockEntity extends BlockEntity {
                 continue;
             }
             RedstoneSource src = be.sources.get(idx);
-            if (src.displayLinkSourcePos != null) continue;
-            String newText = be.getDisplayText(src);
+            String newText;
+            if (src.sourceType == RedstoneSource.Type.DISPLAY_LINK) {
+                newText = src.displayLinkText;
+            } else if (src.sourceType == RedstoneSource.Type.REDSTONE) {
+                newText = be.getDisplayText(src);
+            } else {
+                continue; // IMAGE 源不通过文本更新
+            }
+            if (newText == null) continue;
             // 只在文本变化时更新，避免频繁写终端干扰编辑
             if (!newText.equals(src.lastSentText)) {
                 src.lastSentText = newText;
@@ -307,6 +363,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
         ListTag sourcesTag = new ListTag();
         for (RedstoneSource src : sources) {
             CompoundTag srcTag = new CompoundTag();
+            srcTag.putString("type", src.sourceType.name());
             srcTag.putString("name", src.name);
             srcTag.put("freqItem1", src.frequencyItem1.saveOptional(registries));
             srcTag.put("freqItem2", src.frequencyItem2.saveOptional(registries));
@@ -318,6 +375,11 @@ public class OmniCoreBlockEntity extends BlockEntity {
             }
             if (src.translation != null && src.translation.getMode() != TranslationConfig.Mode.NONE) {
                 srcTag.put("translation", src.translation.serialize());
+            }
+            if (src.sourceType == RedstoneSource.Type.IMAGE) {
+                srcTag.putUUID("ImageId", src.imageId);
+                srcTag.putString("ImageFileName", src.imageFileName);
+                srcTag.putByteArray("ImageData", src.imageData);
             }
             sourcesTag.add(srcTag);
         }
@@ -347,6 +409,10 @@ public class OmniCoreBlockEntity extends BlockEntity {
             ItemStack freqItem1 = ItemStack.parseOptional(registries, srcTag.getCompound("freqItem1"));
             ItemStack freqItem2 = ItemStack.parseOptional(registries, srcTag.getCompound("freqItem2"));
             RedstoneSource src = new RedstoneSource(name, freqItem1, freqItem2);
+            if (srcTag.contains("type")) {
+                try { src.sourceType = RedstoneSource.Type.valueOf(srcTag.getString("type")); }
+                catch (IllegalArgumentException e) { src.sourceType = RedstoneSource.Type.REDSTONE; }
+            }
             if (srcTag.contains("dlSourcePos")) {
                 src.displayLinkSourcePos = BlockPos.of(srcTag.getLong("dlSourcePos"));
             }
@@ -355,6 +421,11 @@ public class OmniCoreBlockEntity extends BlockEntity {
             }
             if (srcTag.contains("translation")) {
                 src.translation = TranslationConfig.deserialize(srcTag.getCompound("translation"));
+            }
+            if (src.sourceType == RedstoneSource.Type.IMAGE) {
+                src.imageId = srcTag.getUUID("ImageId");
+                src.imageFileName = srcTag.getString("ImageFileName");
+                src.imageData = srcTag.getByteArray("ImageData");
             }
             sources.add(src);
         }
@@ -369,6 +440,9 @@ public class OmniCoreBlockEntity extends BlockEntity {
     }
 
     private static class RedstoneSource {
+        enum Type { REDSTONE, DISPLAY_LINK, IMAGE }
+
+        Type sourceType = Type.REDSTONE;
         String name;
         ItemStack frequencyItem1;
         ItemStack frequencyItem2;
@@ -378,10 +452,25 @@ public class OmniCoreBlockEntity extends BlockEntity {
         String displayLinkText;
         TranslationConfig translation;
 
+        // IMAGE 类型专用字段
+        UUID imageId;
+        String imageFileName;
+        byte[] imageData;
+
         RedstoneSource(String name, ItemStack item1, ItemStack item2) {
             this.name = name;
             this.frequencyItem1 = item1;
             this.frequencyItem2 = item2;
+        }
+
+        /** 创建一个 IMAGE 类型的源 */
+        static RedstoneSource image(UUID imageId, String fileName, byte[] data) {
+            RedstoneSource src = new RedstoneSource(fileName, ItemStack.EMPTY, ItemStack.EMPTY);
+            src.sourceType = Type.IMAGE;
+            src.imageId = imageId;
+            src.imageFileName = fileName;
+            src.imageData = data;
+            return src;
         }
     }
 }

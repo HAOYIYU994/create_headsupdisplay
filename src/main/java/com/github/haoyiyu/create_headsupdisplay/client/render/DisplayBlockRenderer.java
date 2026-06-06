@@ -3,16 +3,25 @@ package com.github.haoyiyu.create_headsupdisplay.client.render;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayBlock;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.client.ClientHudData;
+import com.github.haoyiyu.create_headsupdisplay.client.DynamicTextureCache;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferUploader;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import com.simibubi.create.foundation.blockEntity.renderer.SmartBlockEntityRenderer;
 import dev.engine_room.flywheel.lib.transform.TransformStack;
 import net.createmod.catnip.math.AngleHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.resources.ResourceLocation;
+import org.joml.Matrix4f;
 
 public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockEntity> {
 
@@ -109,11 +118,72 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
             }
         }
 
-        // 结束批处理（始终 flush，即使无文本）
+        // 结束批处理
         if (buffer instanceof MultiBufferSource.BufferSource bs) {
             bs.endBatch();
         }
 
+        // --- 渲染图片（Tessellator，只用到 POSITION_COLOR_TEX） ---
+        var images = ClientHudData.getImages();
+        if (images != null && !images.isEmpty()) {
+            for (var img : images) {
+                float dx = img.posX * scaleX;
+                float dy = img.posY * scaleY;
+                if (!inRegion(dx + 8, dy + 8, regionLeft - 32, regionRight + 32, regionTop - 32, regionBottom + 32))
+                    continue;
+                ResourceLocation tex = DynamicTextureCache.getOrCreate(img.imageId, img.imageData);
+                if (tex != null) {
+                    int iw = DynamicTextureCache.getWidth(img.imageId);
+                    int ih = DynamicTextureCache.getHeight(img.imageId);
+                    if (iw > 0 && ih > 0) {
+                        renderImageOnPanel(pose, tex, dx, dy, img.scale, img.rotation, iw, ih, img.alpha);
+                        renderedCount++;
+                    }
+                }
+            }
+        }
+
+        pose.popPose();
+    }
+
+    /** 用 Tessellator 在面板上渲染图片纹理（POSITION_COLOR_TEX，无需 UV1/UV2/Normal） */
+    private void renderImageOnPanel(PoseStack pose, ResourceLocation tex,
+                                    float x, float y, float scale, float rotation,
+                                    int iw, int ih, int alpha) {
+        pose.pushPose();
+        float s = Math.max(0.1f, scale);
+        // 归一化：scale=1 时长边 = 20 面板单位，保持宽高比
+        float baseSize = 20f * s;
+        float maxSide = Math.max(iw, ih);
+        float dw = iw / maxSide * baseSize;
+        float dh = ih / maxSide * baseSize;
+        // 先移到位置，再绕图片中心旋转
+        pose.translate(x + dw/2, y + dh/2, 0.01f);
+        if (rotation != 0) {
+            pose.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(rotation));
+        }
+        pose.translate(-dw/2, -dh/2, 0);
+        Matrix4f mat = pose.last().pose();
+        float a = (alpha & 0xFF) / 255f;
+
+        RenderSystem.setShaderTexture(0, tex);
+        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.setShaderColor(1f, 1f, 1f, a);
+
+        var tesselator = Tesselator.getInstance();
+        var builder = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+        builder.addVertex(mat, 0, 0, 0).setUv(0, 0);
+        builder.addVertex(mat, 0, dh, 0).setUv(0, 1);
+        builder.addVertex(mat, dw, dh, 0).setUv(1, 1);
+        builder.addVertex(mat, dw, 0, 0).setUv(1, 0);
+        var meshData = builder.build();
+        if (meshData != null) BufferUploader.drawWithShader(meshData);
+
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+
+        RenderSystem.disableBlend();
         pose.popPose();
     }
 

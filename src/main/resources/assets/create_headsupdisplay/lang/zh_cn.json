@@ -39,6 +39,8 @@
   "gui.create_headsupdisplay.display_terminal.reset_layout": "重置布局",
   "gui.create_headsupdisplay.display_terminal.save": "保存",
   "gui.create_headsupdisplay.display_terminal.add_static_text": "添加文本",
+  "gui.create_headsupdisplay.display_terminal.add_image": "添加图片",
+  "gui.create_headsupdisplay.upload_image.title": "上传图片",
   "gui.create_headsupdisplay.display_terminal.text_placeholder": "文本",
   "gui.create_headsupdisplay.display_terminal.delete_button": "x",
   "gui.create_headsupdisplay.display_terminal.rotation_prefix": "旋转：%d°",

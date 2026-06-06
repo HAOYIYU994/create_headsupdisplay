@@ -36,6 +36,7 @@ public record RequestSourcesDataPayload(BlockPos corePos) implements CustomPacke
                     for (int i = 0; i < core.getSourceCount(); i++) {
                         var src = core.getSource(i);
                         CompoundTag tag = new CompoundTag();
+                        tag.putString("type", src.sourceType());
                         tag.putString("name", src.name());
                         tag.putInt("strength", src.strength());
                         tag.putString("display", src.displayText());
@@ -49,6 +50,12 @@ public record RequestSourcesDataPayload(BlockPos corePos) implements CustomPacke
                         var tc = core.getTranslation(i);
                         if (tc != null && tc.getMode() != com.github.haoyiyu.create_headsupdisplay.config.TranslationConfig.Mode.NONE) {
                             tag.put("translation", tc.serialize());
+                        }
+                        // IMAGE 类型字段
+                        if ("IMAGE".equals(src.sourceType())) {
+                            tag.putUUID("ImageId", src.imageId());
+                            tag.putString("ImageFileName", src.imageFileName());
+                            tag.putByteArray("ImageData", src.imageData());
                         }
                         list.add(tag);
                     }

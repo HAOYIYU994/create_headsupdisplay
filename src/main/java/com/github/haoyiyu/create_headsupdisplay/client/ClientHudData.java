@@ -8,6 +8,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @OnlyIn(Dist.CLIENT)
 public class ClientHudData {
@@ -15,6 +16,7 @@ public class ClientHudData {
     private static CompoundTag currentDisplayData = new CompoundTag();
     private static List<SlotRenderData> slots = new ArrayList<>();
     private static List<StaticTextRenderData> staticTexts = new ArrayList<>();
+    private static List<ImageRenderData> images = new ArrayList<>();
 
     public static void updateConfig(HudPositionConfig config) {
         currentConfig = config;
@@ -62,6 +64,25 @@ public class ClientHudData {
                 staticTexts.add(new StaticTextRenderData(text, posX, posY, scale, rotation, color, alpha));
             }
         }
+
+        // 解析图片槽位
+        images.clear();
+        if (data.contains("imageCount")) {
+            int imageCount = data.getInt("imageCount");
+            for (int i = 0; i < imageCount; i++) {
+                CompoundTag tag = data.getCompound("image_" + i);
+                UUID imageId = tag.getUUID("ImageId");
+                String fileName = tag.getString("FileName");
+                byte[] imageBytes = tag.getByteArray("ImageData");
+                int posX = tag.getInt("PosX");
+                int posY = tag.getInt("PosY");
+                float scale = tag.getFloat("Scale");
+                float rotation = tag.getFloat("Rotation");
+                int alpha = tag.getInt("Alpha");
+                images.add(new ImageRenderData(imageId, imageBytes, fileName, posX, posY, scale, rotation, alpha));
+                DynamicTextureCache.getOrCreate(imageId, imageBytes);
+            }
+        }
     }
 
     public static CompoundTag getCurrentDisplayData() {
@@ -74,6 +95,10 @@ public class ClientHudData {
 
     public static List<StaticTextRenderData> getStaticTextSlots() {
         return staticTexts;
+    }
+
+    public static List<ImageRenderData> getImages() {
+        return images;
     }
 
     // 数据源槽位渲染数据
@@ -116,6 +141,28 @@ public class ClientHudData {
             this.scale = scale;
             this.rotation = rotation;
             this.color = color;
+            this.alpha = alpha;
+        }
+    }
+
+    // 图片槽位渲染数据
+    public static class ImageRenderData {
+        public final UUID imageId;
+        public final byte[] imageData;
+        public final String fileName;
+        public final int posX, posY;
+        public final float scale;
+        public final float rotation;
+        public final int alpha;
+
+        public ImageRenderData(UUID imageId, byte[] imageData, String fileName, int posX, int posY, float scale, float rotation, int alpha) {
+            this.imageId = imageId;
+            this.imageData = imageData;
+            this.fileName = fileName;
+            this.posX = posX;
+            this.posY = posY;
+            this.scale = scale;
+            this.rotation = rotation;
             this.alpha = alpha;
         }
     }

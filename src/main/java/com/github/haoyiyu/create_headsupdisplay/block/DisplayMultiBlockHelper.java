@@ -91,7 +91,7 @@ public class DisplayMultiBlockHelper {
                 level.setBlockAndUpdate(pos, baseState.setValue(SHAPE, shape));
                 if (level.getBlockEntity(pos) instanceof DisplayBlockEntity be) {
                     be.setControllerPos(controllerPos, w, h);
-                    if (i == 0 && j == 0 && oldTerminal != null)
+                    if (oldTerminal != null)
                         be.setBoundTerminal(oldTerminal);
                 }
             }

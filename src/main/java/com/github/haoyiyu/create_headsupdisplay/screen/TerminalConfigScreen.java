@@ -1,6 +1,8 @@
 package com.github.haoyiyu.create_headsupdisplay.screen;
 
+import com.github.haoyiyu.create_headsupdisplay.client.DynamicTextureCache;
 import com.github.haoyiyu.create_headsupdisplay.network.*;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -8,6 +10,7 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.network.chat.Component;
@@ -15,14 +18,17 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 public class TerminalConfigScreen extends Screen {
     private final List<SlotEntry> slots = new ArrayList<>();
     private final List<StaticTextEntry> staticTexts = new ArrayList<>();
+    private final List<ImageEntry> images = new ArrayList<>();
     private BlockPos terminalPos;
 
     private SlotEntry draggingSlot = null;
     private StaticTextEntry draggingStatic = null;
+    private ImageEntry draggingImage = null;
     private int dragOffsetX, dragOffsetY;
 
     private EditBox addTextInput;
@@ -60,6 +66,21 @@ public class TerminalConfigScreen extends Screen {
             int color = st.getInt("color");
             int alpha = st.getInt("alpha");
             staticTexts.add(new StaticTextEntry(text, posX, posY, scale, rotation, color, alpha));
+        }
+
+        // Parse image slots
+        ListTag imageTag = data.getList("Images", CompoundTag.TAG_COMPOUND);
+        for (int i = 0; i < imageTag.size(); i++) {
+            CompoundTag tag = imageTag.getCompound(i);
+            UUID imageId = tag.getUUID("ImageId");
+            String fileName = tag.getString("FileName");
+            byte[] imageBytes = tag.getByteArray("ImageData");
+            int posX = tag.getInt("PosX");
+            int posY = tag.getInt("PosY");
+            float scale = tag.getFloat("Scale");
+            float rotation = tag.getFloat("Rotation");
+            int alpha = tag.getInt("Alpha");
+            images.add(new ImageEntry(imageId, fileName, imageBytes, posX, posY, scale, rotation, alpha));
         }
     }
 
@@ -139,6 +160,9 @@ public class TerminalConfigScreen extends Screen {
             StaticTextEntry entry = staticTexts.get(i);
             PacketDistributor.sendToServer(new UpdateStaticTextPayload(terminalPos, i, entry.text, entry.posX, entry.posY, entry.scale, entry.rotation, entry.color, entry.alpha));
         }
+        for (ImageEntry entry : images) {
+            PacketDistributor.sendToServer(new UpdateImageConfigPayload(terminalPos, entry.imageId, entry.posX, entry.posY, entry.scale, entry.rotation, entry.alpha));
+        }
         onClose();
     }
 
@@ -202,6 +226,54 @@ public class TerminalConfigScreen extends Screen {
             if (previewY < entry.posY) previewY = entry.posY;
             int previewColor = 0xFF000000 | (entry.color & 0x00FFFFFF);
             graphics.fill(previewX, previewY, previewX + previewSize, previewY + previewSize, previewColor);
+        }
+
+        // 图片槽位
+        for (ImageEntry entry : images) {
+            int w = 100;
+            int h = 60;
+
+            // 文件名（框上方）
+            String name = entry.fileName.length() > 24 ? entry.fileName.substring(0, 22) + ".." : entry.fileName;
+            graphics.drawString(font, name, entry.posX + 1, entry.posY - 12, 0xCCCCCC, false);
+
+            // 背景框
+            graphics.fill(entry.posX, entry.posY, entry.posX + w, entry.posY + h, 0xAA222233);
+            graphics.fill(entry.posX, entry.posY, entry.posX + w, entry.posY + 1, 0xAA6666AA);
+            graphics.fill(entry.posX, entry.posY + h - 1, entry.posX + w, entry.posY + h, 0xAA6666AA);
+
+            // 预览图
+            ResourceLocation tex = DynamicTextureCache.getOrCreate(entry.imageId, entry.imageData);
+            if (tex != null) {
+                int iw = DynamicTextureCache.getWidth(entry.imageId);
+                int ih = DynamicTextureCache.getHeight(entry.imageId);
+                if (iw > 0 && ih > 0) {
+                    int pad = 4;
+                    float fit = Math.min((float)(w - pad*2) / iw, (float)(h - pad*2) / ih);
+                    int dw = (int)(iw * fit);
+                    int dh = (int)(ih * fit);
+                    int dx = entry.posX + (w - dw) / 2;
+                    int dy = entry.posY + (h - dh) / 2;
+                    RenderSystem.enableBlend();
+                    graphics.blit(tex, dx, dy, 0, 0, dw, dh, dw, dh);
+                    RenderSystem.disableBlend();
+                }
+            }
+
+            // 删除按钮
+            int delX = entry.posX + w - 12;
+            graphics.fill(delX, entry.posY, delX + 10, entry.posY + 10, 0xAAFF4444);
+            graphics.drawString(font, "X", delX + 3, entry.posY + 1, 0xFFFFFF, false);
+
+            // Alpha 按钮（左下）
+            int alphaX = entry.posX + 2;
+            int alphaY = entry.posY + h - 12;
+            graphics.fill(alphaX, alphaY, alphaX + 30, alphaY + 10, 0xAA555555);
+            graphics.drawString(font, "A:" + (int)(entry.alpha / 255f * 100) + "%", alphaX + 2, alphaY + 1, 0xFFFFFF, false);
+
+            // 参数行（框下方）
+            String info = "R:" + (int)entry.rotation + " S:" + String.format("%.1f", entry.scale);
+            graphics.drawString(font, info, entry.posX + 2, entry.posY + h + 2, 0xAAAAAA, false);
         }
     }
 
@@ -281,12 +353,53 @@ public class TerminalConfigScreen extends Screen {
                     return true;
                 }
             }
+            // 图片 Alpha 按钮
+            for (ImageEntry entry : images) {
+                int w = 100;
+                int h = 60;
+                int alphaX = entry.posX + 2;
+                int alphaY = entry.posY + h - 12;
+                if (mouseX >= alphaX && mouseX <= alphaX + 30 && mouseY >= alphaY && mouseY <= alphaY + 10) {
+                    openAlphaEditScreen(entry);
+                    return true;
+                }
+            }
+            // 图片删除按钮
+            for (ImageEntry entry : images) {
+                int w = 100;
+                int delX = entry.posX + w - 12;
+                int delY = entry.posY;
+                if (mouseX >= delX && mouseX <= delX + 10 && mouseY >= delY && mouseY <= delY + 10) {
+                    PacketDistributor.sendToServer(new RemoveImagePayload(terminalPos, entry.imageId));
+                    images.remove(entry);
+                    return true;
+                }
+            }
+            // 图片拖拽区域
+            for (ImageEntry entry : images) {
+                int w = 100;
+                int h = 60;
+                if (mouseX >= entry.posX && mouseX <= entry.posX + w && mouseY >= entry.posY && mouseY <= entry.posY + h) {
+                    draggingImage = entry;
+                    dragOffsetX = (int)(mouseX - entry.posX);
+                    dragOffsetY = (int)(mouseY - entry.posY);
+                    return true;
+                }
+            }
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private void openColorEditScreen(Object entry) {
         Minecraft.getInstance().setScreen(new ColorEditScreen(entry, this));
+    }
+
+    private void openAlphaEditScreen(ImageEntry entry) {
+        Minecraft.getInstance().setScreen(new AlphaEditScreen(entry, this));
+    }
+
+    public void updateImageAlpha(ImageEntry entry, int alpha) {
+        entry.alpha = alpha;
     }
 
     public void updateSlotColorAndAlpha(Object entry, int color, int alpha) {
@@ -319,6 +432,15 @@ public class TerminalConfigScreen extends Screen {
             draggingStatic.posY = Math.min(Math.max(newY, 0), height - h);
             return true;
         }
+        if (draggingImage != null && button == 0) {
+            int newX = (int) (mouseX - dragOffsetX);
+            int newY = (int) (mouseY - dragOffsetY);
+            int w = 100;
+            int h = 60;
+            draggingImage.posX = Math.min(Math.max(newX, 0), width - w);
+            draggingImage.posY = Math.min(Math.max(newY, 0), height - h);
+            return true;
+        }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
     }
 
@@ -326,6 +448,7 @@ public class TerminalConfigScreen extends Screen {
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         draggingSlot = null;
         draggingStatic = null;
+        draggingImage = null;
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
@@ -360,6 +483,21 @@ public class TerminalConfigScreen extends Screen {
                 } else {
                     float newScale = entry.scale + (float)(scrollDelta > 0 ? 0.1f : -0.1f);
                     entry.scale = Math.min(Math.max(newScale, 0.5f), 2.0f);
+                }
+                return true;
+            }
+        }
+        for (ImageEntry entry : images) {
+            int w = 100;
+            int h = 60;
+            if (mouseX >= entry.posX && mouseX <= entry.posX + w && mouseY >= entry.posY && mouseY <= entry.posY + h) {
+                if (ctrl) {
+                    float delta = (float)(scrollDelta > 0 ? 5f : -5f);
+                    entry.rotation += delta;
+                    entry.rotation %= 360;
+                } else {
+                    float newScale = entry.scale + (float)(scrollDelta > 0 ? 0.1f : -0.1f);
+                    entry.scale = Math.min(Math.max(newScale, 0.1f), 5.0f);
                 }
                 return true;
             }
@@ -437,6 +575,51 @@ public class TerminalConfigScreen extends Screen {
         return 255;
     }
 
+    /** 图片 Alpha 编辑器（只调透明度） */
+    private class AlphaEditScreen extends Screen {
+        private final ImageEntry target;
+        private final TerminalConfigScreen parent;
+        private AbstractSliderButton alphaSlider;
+        private int currentAlpha;
+
+        protected AlphaEditScreen(ImageEntry target, TerminalConfigScreen parent) {
+            super(Component.literal("Edit Alpha"));
+            this.target = target;
+            this.parent = parent;
+            this.currentAlpha = target.alpha;
+        }
+
+        @Override
+        protected void init() {
+            super.init();
+            int cx = width / 2;
+            int cy = height / 2;
+
+            alphaSlider = new AbstractSliderButton(cx - 60, cy - 10, 120, 20,
+                    Component.literal("Alpha: " + currentAlpha), currentAlpha / 255.0) {
+                @Override protected void updateMessage() {
+                    setMessage(Component.literal("Alpha: " + (int)(value * 255)));
+                }
+                @Override protected void applyValue() {
+                    currentAlpha = (int)(value * 255);
+                }
+            };
+            addRenderableWidget(alphaSlider);
+
+            addRenderableWidget(Button.builder(Component.literal("OK"), b -> {
+                target.alpha = currentAlpha;
+                Minecraft.getInstance().setScreen(parent);
+            }).bounds(cx - 20, cy + 20, 40, 20).build());
+        }
+
+        @Override
+        public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+            renderBackground(graphics, mouseX, mouseY, partialTick);
+            super.render(graphics, mouseX, mouseY, partialTick);
+            graphics.drawCenteredString(font, "Image Transparency", width / 2, height / 2 - 40, 0xFFFFFF);
+        }
+    }
+
     // 内部类
     private static class SlotEntry {
         final BlockPos sourcePos;
@@ -474,6 +657,27 @@ public class TerminalConfigScreen extends Screen {
             this.scale = scale;
             this.rotation = rotation;
             this.color = color;
+            this.alpha = alpha;
+        }
+    }
+
+    private static class ImageEntry {
+        final UUID imageId;
+        final String fileName;
+        byte[] imageData;
+        int posX, posY;
+        float scale;
+        float rotation;
+        int alpha;
+
+        ImageEntry(UUID imageId, String fileName, byte[] imageData, int posX, int posY, float scale, float rotation, int alpha) {
+            this.imageId = imageId;
+            this.fileName = fileName;
+            this.imageData = imageData;
+            this.posX = posX;
+            this.posY = posY;
+            this.scale = scale;
+            this.rotation = rotation;
             this.alpha = alpha;
         }
     }

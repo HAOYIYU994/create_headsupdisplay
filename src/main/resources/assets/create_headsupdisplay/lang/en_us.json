@@ -39,6 +39,8 @@
   "gui.create_headsupdisplay.display_terminal.reset_layout": "Reset Layout",
   "gui.create_headsupdisplay.display_terminal.save": "Save",
   "gui.create_headsupdisplay.display_terminal.add_static_text": "Add Text",
+  "gui.create_headsupdisplay.display_terminal.add_image": "Add Image",
+  "gui.create_headsupdisplay.upload_image.title": "Upload Image",
   "gui.create_headsupdisplay.display_terminal.text_placeholder": "Text",
   "gui.create_headsupdisplay.display_terminal.delete_button": "X",
   "gui.create_headsupdisplay.display_terminal.rotation_prefix": "R:%d°",

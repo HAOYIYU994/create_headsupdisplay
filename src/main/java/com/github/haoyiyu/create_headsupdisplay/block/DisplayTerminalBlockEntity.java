@@ -1,6 +1,7 @@
 package com.github.haoyiyu.create_headsupdisplay.block;
 
 import com.github.haoyiyu.create_headsupdisplay.config.DisplaySlot;
+import com.github.haoyiyu.create_headsupdisplay.config.ImageSlot;
 import com.github.haoyiyu.create_headsupdisplay.config.StaticTextSlot;
 import com.github.haoyiyu.create_headsupdisplay.menu.DisplayTerminalMenu;
 import com.github.haoyiyu.create_headsupdisplay.registration.ModBlockEntities;
@@ -23,6 +24,7 @@ import com.github.haoyiyu.create_headsupdisplay.network.UpdateStaticTextPayload;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -32,6 +34,8 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
     private final Map<BlockPos, DisplaySlot> slots = new HashMap<>();
     // 静态文本槽位（用户手动添加）
     private final List<StaticTextSlot> staticTextSlots = new ArrayList<>();
+    // 图片槽位（从 OmniCore Send 过来）
+    private final Map<UUID, ImageSlot> imageSlots = new LinkedHashMap<>();
 
     public DisplayTerminalBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.DISPLAY_TERMINAL_BE.get(), pos, state);
@@ -180,21 +184,23 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
             full.put("static_" + i, staticData.get(i));
         }
 
-        // 发送给所有绑定此终端的玩家
+        // 图片槽位
+        List<CompoundTag> imgList = new ArrayList<>();
+        for (ImageSlot s : imageSlots.values()) imgList.add(s.serialize());
+        full.putInt("imageCount", imgList.size());
+        for (int i = 0; i < imgList.size(); i++) full.put("image_" + i, imgList.get(i));
+
+        // 发送给所有在线玩家
+        var syncPayload = new SyncDisplayDataPayload(full);
         for (ServerPlayer player : level.getServer().getPlayerList().getPlayers()) {
-            var helmet = player.getInventory().armor.get(3);
-            if (helmet.getItem() instanceof HeadMountDisplayItem) {
-                BlockPos boundPos = HeadMountDisplayItem.getBoundTerminalPos(helmet);
-                if (boundPos != null && boundPos.equals(this.worldPosition)) {
-                    PacketDistributor.sendToPlayer(player, new SyncDisplayDataPayload(full));
-                }
-            }
+            PacketDistributor.sendToPlayer(player, syncPayload);
         }
     }
 
     // ========== 打开配置屏幕（发送所有数据） ==========
     public void openConfigurationScreen(Player player) {
         if (level != null && !level.isClientSide && player instanceof ServerPlayer serverPlayer) {
+            syncToBoundPlayers(); // 先同步当前数据
             sendOpenConfigScreen(serverPlayer);
         }
     }
@@ -235,6 +241,11 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
             staticTag.add(tag);
         }
         full.put("StaticTexts", staticTag);
+
+        // 图片槽位
+        ListTag imageTag = new ListTag();
+        for (ImageSlot s : imageSlots.values()) imageTag.add(s.serialize());
+        full.put("Images", imageTag);
 
         PacketDistributor.sendToPlayer(player, new OpenTerminalConfigScreenPayload(full));
     }
@@ -308,6 +319,22 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
             setChanged();
             syncToBoundPlayers();
         }
+    }
+
+    // ========== 图片槽位管理 ==========
+    public List<ImageSlot> getImageSlots() { return new ArrayList<>(imageSlots.values()); }
+    public void addImageSlot(UUID imageId, String fileName, byte[] imageData) {
+        if (imageData == null || imageData.length > 512 * 1024) return;
+        ImageSlot slot = new ImageSlot(imageId, fileName, imageData);
+        imageSlots.put(imageId, slot);
+        setChanged();
+    }
+    public void removeImageSlot(UUID imageId) {
+        if (imageSlots.remove(imageId) != null) setChanged();
+    }
+    public void updateImageConfig(UUID imageId, int posX, int posY, float scale, float rotation, int alpha) {
+        ImageSlot slot = imageSlots.get(imageId);
+        if (slot != null) { slot.setPos(posX, posY); slot.setScale(scale); slot.setRotation(rotation); slot.setAlpha(alpha); setChanged(); syncToBoundPlayers(); }
     }
 
     public void displayData(BlockPos sourcePos, CompoundTag data) {

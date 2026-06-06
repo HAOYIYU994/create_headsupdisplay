@@ -1,9 +1,12 @@
 package com.github.haoyiyu.create_headsupdisplay.hud;
 
 import com.github.haoyiyu.create_headsupdisplay.client.ClientHudData;
+import com.github.haoyiyu.create_headsupdisplay.client.DynamicTextureCache;
 import com.github.haoyiyu.create_headsupdisplay.item.HeadMountDisplayItem;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
@@ -86,6 +89,32 @@ public class HudOverlayRenderer {
                 graphics.drawString(font, slot.text.replaceAll("§[0-9a-fk-or]", ""), 0, 0, argb, false);
                 graphics.pose().popPose();
             }
+        }
+
+        // 渲染图片槽位
+        var images = ClientHudData.getImages();
+        if (images != null && !images.isEmpty()) {
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
+            for (var img : images) {
+                graphics.pose().pushPose();
+                graphics.pose().translate(img.posX, img.posY, 0);
+                graphics.pose().scale(img.scale, img.scale, 1.0f);
+                graphics.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(img.rotation));
+
+                ResourceLocation tex = DynamicTextureCache.getOrCreate(img.imageId, img.imageData);
+                if (tex != null) {
+                    int w = DynamicTextureCache.getWidth(img.imageId);
+                    int h = DynamicTextureCache.getHeight(img.imageId);
+                    if (w > 0 && h > 0) {
+                        RenderSystem.setShaderColor(1f, 1f, 1f, img.alpha / 255f);
+                        graphics.blit(tex, 0, 0, 0, 0, w, h, w, h);
+                    }
+                }
+                graphics.pose().popPose();
+            }
+            RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+            RenderSystem.disableBlend();
         }
     }
 }

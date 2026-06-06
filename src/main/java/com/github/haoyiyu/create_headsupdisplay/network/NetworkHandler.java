@@ -151,6 +151,42 @@ public class NetworkHandler {
                 UpdateTranslationPayload::handle
         );
 
+        // ========== 图片系统网络包 ==========
+        // 初始化分块图片上传（客户端 -> 服务端）
+        registrar.playToServer(
+                UploadImageInitPayload.TYPE,
+                UploadImageInitPayload.CODEC,
+                UploadImageInitPayload::handle
+        );
+
+        // 图片数据块（客户端 -> 服务端）
+        registrar.playToServer(
+                UploadImageChunkPayload.TYPE,
+                UploadImageChunkPayload.CODEC,
+                UploadImageChunkPayload::handle
+        );
+
+        // 图片上传完成（客户端 -> 服务端）
+        registrar.playToServer(
+                UploadImageCompletePayload.TYPE,
+                UploadImageCompletePayload.CODEC,
+                UploadImageCompletePayload::handle
+        );
+
+        // 更新图片布局配置（客户端 -> 服务端）
+        registrar.playToServer(
+                UpdateImageConfigPayload.TYPE,
+                UpdateImageConfigPayload.CODEC,
+                UpdateImageConfigPayload::handle
+        );
+
+        // 删除图片（客户端 -> 服务端）
+        registrar.playToServer(
+                RemoveImagePayload.TYPE,
+                RemoveImagePayload.CODEC,
+                RemoveImagePayload::handle
+        );
+
         // ========== 频率选择容器菜单包 ==========
         // 请求打开频率选择界面（客户端 -> 服务端）
         registrar.playToServer(
