@@ -49,10 +49,12 @@
 ## 开发状态
 
 - 目前这个模组属于早期开发状态，并没有完成全部内容
+- 这个介绍界面我懒得经常更新，所以有些新内容不在这里
 
 ## 致谢
 
 - [Create 团队](https://github.com/Creators-of-Create) 提供的强大 API 和示例，及其部分纹理资源。
+- [Create-Radar-Sable](https://github.com/DXENDBucket/Create-Radar-Sable) 提供的显示器方块模型与贴图资源。
 - 所有测试者与贡献者。
 
 ## 许可证
