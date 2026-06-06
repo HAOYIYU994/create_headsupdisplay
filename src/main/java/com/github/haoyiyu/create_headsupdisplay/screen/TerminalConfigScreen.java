@@ -24,11 +24,13 @@ public class TerminalConfigScreen extends Screen {
     private final List<SlotEntry> slots = new ArrayList<>();
     private final List<StaticTextEntry> staticTexts = new ArrayList<>();
     private final List<ImageEntry> images = new ArrayList<>();
+    private final List<RadarEntry> radars = new ArrayList<>();
     private BlockPos terminalPos;
 
     private SlotEntry draggingSlot = null;
     private StaticTextEntry draggingStatic = null;
     private ImageEntry draggingImage = null;
+    private RadarEntry draggingRadar = null;
     private int dragOffsetX, dragOffsetY;
 
     private EditBox addTextInput;
@@ -81,6 +83,19 @@ public class TerminalConfigScreen extends Screen {
             float rotation = tag.getFloat("Rotation");
             int alpha = tag.getInt("Alpha");
             images.add(new ImageEntry(imageId, fileName, imageBytes, posX, posY, scale, rotation, alpha));
+        }
+
+        // Parse radar slots
+        if (data.contains("radarCount")) {
+            int radarCount = data.getInt("radarCount");
+            for (int i = 0; i < radarCount; i++) {
+                CompoundTag tag = data.getCompound("radar_" + i);
+                radars.add(new RadarEntry(
+                    tag.getInt("PosX"), tag.getInt("PosY"),
+                    tag.getFloat("Scale"), tag.getFloat("Rotation"),
+                    tag.getInt("Alpha"), tag.getInt("RadarRange")
+                ));
+            }
         }
     }
 
@@ -162,6 +177,10 @@ public class TerminalConfigScreen extends Screen {
         }
         for (ImageEntry entry : images) {
             PacketDistributor.sendToServer(new UpdateImageConfigPayload(terminalPos, entry.imageId, entry.posX, entry.posY, entry.scale, entry.rotation, entry.alpha));
+        }
+        for (int i = 0; i < radars.size(); i++) {
+            RadarEntry entry = radars.get(i);
+            PacketDistributor.sendToServer(new UpdateRadarSlotPayload(terminalPos, i, entry.posX, entry.posY, entry.scale, entry.rotation, entry.alpha, entry.radarRange));
         }
         onClose();
     }
@@ -275,6 +294,33 @@ public class TerminalConfigScreen extends Screen {
             String info = "R:" + (int)entry.rotation + " S:" + String.format("%.1f", entry.scale);
             graphics.drawString(font, info, entry.posX + 2, entry.posY + h + 2, 0xAAAAAA, false);
         }
+
+        // 雷达图槽位
+        for (RadarEntry entry : radars) {
+            int w = 100, h = 60;
+            String label = "[Radar]";
+            graphics.drawString(font, label, entry.posX + 1, entry.posY - 12, 0x00FF00, false);
+            graphics.fill(entry.posX, entry.posY, entry.posX + w, entry.posY + h, 0xAA003300);
+            graphics.fill(entry.posX, entry.posY, entry.posX + w, entry.posY + 1, 0xAA00AA00);
+            graphics.fill(entry.posX, entry.posY + h - 1, entry.posX + w, entry.posY + h, 0xAA00AA00);
+            // 模拟雷达图
+            int cx = entry.posX + w/2, cy = entry.posY + h/2, r = 20;
+            graphics.fill(cx - r, cy - r, cx + r, cy + r, 0x66002200);
+            graphics.fill(cx - 1, cy - r, cx + 1, cy + r, 0x66006600);
+            graphics.fill(cx - r, cy - 1, cx + r, cy + 1, 0x66006600);
+            graphics.fill(cx - 2, cy - 2, cx + 3, cy + 3, 0xAA00FF00);
+            // 删除按钮
+            int delX = entry.posX + w - 12;
+            graphics.fill(delX, entry.posY, delX + 10, entry.posY + 10, 0xAAFF4444);
+            graphics.drawString(font, "X", delX + 3, entry.posY + 1, 0xFFFFFF, false);
+            // Alpha
+            int alphaX = entry.posX + 2, alphaY = entry.posY + h - 12;
+            graphics.fill(alphaX, alphaY, alphaX + 30, alphaY + 10, 0xAA555555);
+            graphics.drawString(font, "A:" + (int)(entry.alpha/255f*100) + "%", alphaX + 2, alphaY + 1, 0xFFFFFF, false);
+            // info
+            String info = "R:" + (int)entry.rotation + " S:" + String.format("%.1f", entry.scale) + " Range:" + entry.radarRange;
+            graphics.drawString(font, info, entry.posX + 2, entry.posY + h + 2, 0xAAAAAA, false);
+        }
     }
 
     @Override
@@ -386,6 +432,26 @@ public class TerminalConfigScreen extends Screen {
                     return true;
                 }
             }
+            // 雷达删除按钮
+            for (RadarEntry entry : radars) {
+                int w = 100, h = 60;
+                int delX = entry.posX + w - 12;
+                if (mouseX >= delX && mouseX <= delX + 10 && mouseY >= entry.posY && mouseY <= entry.posY + 10) {
+                    PacketDistributor.sendToServer(new RemoveRadarSlotPayload(terminalPos, radars.indexOf(entry)));
+                    radars.remove(entry);
+                    return true;
+                }
+            }
+            // 雷达拖拽
+            for (RadarEntry entry : radars) {
+                int w = 100, h = 60;
+                if (mouseX >= entry.posX && mouseX <= entry.posX + w && mouseY >= entry.posY && mouseY <= entry.posY + h) {
+                    draggingRadar = entry;
+                    dragOffsetX = (int)(mouseX - entry.posX);
+                    dragOffsetY = (int)(mouseY - entry.posY);
+                    return true;
+                }
+            }
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
@@ -441,6 +507,15 @@ public class TerminalConfigScreen extends Screen {
             draggingImage.posY = Math.min(Math.max(newY, 0), height - h);
             return true;
         }
+        if (draggingRadar != null && button == 0) {
+            int newX = (int) (mouseX - dragOffsetX);
+            int newY = (int) (mouseY - dragOffsetY);
+            int w = 100;
+            int h = 60;
+            draggingRadar.posX = Math.min(Math.max(newX, 0), width - w);
+            draggingRadar.posY = Math.min(Math.max(newY, 0), height - h);
+            return true;
+        }
         return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
     }
 
@@ -449,6 +524,7 @@ public class TerminalConfigScreen extends Screen {
         draggingSlot = null;
         draggingStatic = null;
         draggingImage = null;
+        draggingRadar = null;
         return super.mouseReleased(mouseX, mouseY, button);
     }
 
@@ -490,6 +566,20 @@ public class TerminalConfigScreen extends Screen {
         for (ImageEntry entry : images) {
             int w = 100;
             int h = 60;
+            if (mouseX >= entry.posX && mouseX <= entry.posX + w && mouseY >= entry.posY && mouseY <= entry.posY + h) {
+                if (ctrl) {
+                    float delta = (float)(scrollDelta > 0 ? 5f : -5f);
+                    entry.rotation += delta;
+                    entry.rotation %= 360;
+                } else {
+                    float newScale = entry.scale + (float)(scrollDelta > 0 ? 0.1f : -0.1f);
+                    entry.scale = Math.min(Math.max(newScale, 0.1f), 5.0f);
+                }
+                return true;
+            }
+        }
+        for (RadarEntry entry : radars) {
+            int w = 100, h = 60;
             if (mouseX >= entry.posX && mouseX <= entry.posX + w && mouseY >= entry.posY && mouseY <= entry.posY + h) {
                 if (ctrl) {
                     float delta = (float)(scrollDelta > 0 ? 5f : -5f);
@@ -679,6 +769,23 @@ public class TerminalConfigScreen extends Screen {
             this.scale = scale;
             this.rotation = rotation;
             this.alpha = alpha;
+        }
+    }
+
+    private static class RadarEntry {
+        int posX, posY;
+        float scale;
+        float rotation;
+        int alpha;
+        int radarRange;
+
+        RadarEntry(int posX, int posY, float scale, float rotation, int alpha, int radarRange) {
+            this.posX = posX;
+            this.posY = posY;
+            this.scale = scale;
+            this.rotation = rotation;
+            this.alpha = alpha;
+            this.radarRange = radarRange;
         }
     }
 }

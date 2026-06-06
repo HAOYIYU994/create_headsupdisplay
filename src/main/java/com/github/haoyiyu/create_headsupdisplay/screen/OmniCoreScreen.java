@@ -34,6 +34,8 @@ import java.util.UUID;
 public class OmniCoreScreen extends Screen {
     private final BlockPos corePos;
     private final List<SourceEntry> sources = new ArrayList<>();
+    private final List<BlockPos> boundTerminalList = new ArrayList<>();
+    private int selectedTerminal = -1; // -1 = 所有终端
     private int scrollOffset = 0;
     private static final int ENTRY_HEIGHT = 25;
     private int tickCounter = 0;
@@ -43,6 +45,12 @@ public class OmniCoreScreen extends Screen {
     public OmniCoreScreen(CompoundTag data) {
         super(Component.translatable("gui.create_headsupdisplay.omni_core.title"));
         this.corePos = BlockPos.of(data.getLong("CorePos"));
+        if (data.contains("BoundTerminalsList")) {
+            ListTag terminalsTag = data.getList("BoundTerminalsList", Tag.TAG_COMPOUND);
+            for (int i = 0; i < terminalsTag.size(); i++) {
+                boundTerminalList.add(BlockPos.of(terminalsTag.getCompound(i).getLong("Pos")));
+            }
+        }
         loadSourcesFromTag(data);
     }
 
@@ -85,6 +93,24 @@ public class OmniCoreScreen extends Screen {
             }
             sources.add(entry);
         }
+
+        // 加载雷达槽位
+        if (data.contains("RadarSlots")) {
+            ListTag radarSlotTag = data.getList("RadarSlots", Tag.TAG_COMPOUND);
+            for (int i = 0; i < radarSlotTag.size(); i++) {
+                CompoundTag slotTag = radarSlotTag.getCompound(i);
+                SourceEntry entry = new SourceEntry("§a[Radar]", ItemStack.EMPTY, ItemStack.EMPTY, 0, "Radar Display", null, null);
+                entry.isRadar = true;
+                entry.radarIndex = i;
+                entry.radarPosX = slotTag.getInt("PosX");
+                entry.radarPosY = slotTag.getInt("PosY");
+                entry.radarScale = slotTag.getFloat("Scale");
+                entry.radarRotation = slotTag.getFloat("Rotation");
+                entry.radarAlpha = slotTag.getInt("Alpha");
+                entry.radarRange = slotTag.getInt("RadarRange");
+                sources.add(entry);
+            }
+        }
     }
 
     @Override
@@ -99,11 +125,16 @@ public class OmniCoreScreen extends Screen {
             Minecraft.getInstance().setScreen(new ImageUploadScreen(this));
         }).bounds(10, 34, 100, 20).build());
 
+        // 扫描附近雷达
+        addRenderableWidget(Button.builder(Component.literal("Scan Radar"), b -> {
+            PacketDistributor.sendToServer(new ScanRadarPayload(corePos));
+        }).bounds(10, 58, 100, 20).build());
+
         addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.sort_on"), b -> {
             PacketDistributor.sendToServer(new ToggleAutoSortPayload(corePos));
             autoSort = !autoSort;
             b.setMessage(Component.translatable(autoSort ? "gui.create_headsupdisplay.sort_on" : "gui.create_headsupdisplay.sort_off"));
-        }).bounds(10, 58, 100, 20).build());
+        }).bounds(10, 82, 100, 20).build());
 
         addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.back"), b -> onClose())
                 .bounds(10, height - 30, 60, 20).build());
@@ -146,6 +177,25 @@ public class OmniCoreScreen extends Screen {
         renderBackground(graphics, mouseX, mouseY, partialTick);
         super.render(graphics, mouseX, mouseY, partialTick);
 
+        // ===== 右上角：终端选择器 =====
+        if (!boundTerminalList.isEmpty()) {
+            int selectorX = width - 170;
+            int selectorY = 4;
+            String label;
+            if (selectedTerminal < 0) {
+                label = "→ All Terminals";
+            } else {
+                BlockPos tp = boundTerminalList.get(selectedTerminal);
+                label = "→ " + tp.toShortString();
+            }
+            graphics.fill(selectorX, selectorY, selectorX + 160, selectorY + 16, 0xCC333333);
+            graphics.drawString(font, label, selectorX + 4, selectorY + 4, 0x00FF00);
+            // 点击区域记录
+            if (mouseX >= selectorX && mouseX <= selectorX + 160 && mouseY >= selectorY && mouseY <= selectorY + 16) {
+                graphics.fill(selectorX, selectorY, selectorX + 160, selectorY + 1, 0xFF00FF00);
+            }
+        }
+
         int startX = 160;
         int startY = 18;
         graphics.drawString(font, Component.translatable("gui.create_headsupdisplay.signal_sources").getString(), startX, startY - 5, 0xFFFFFF);
@@ -171,6 +221,14 @@ public class OmniCoreScreen extends Screen {
                 graphics.fill(purpleLeft, iconY - 1, purpleRight, iconY + iconSize + 1, 0xAAFF00FF);
                 int centerIconX = (purpleLeft + purpleRight) / 2 - 8;
                 graphics.renderItem(new ItemStack(net.minecraft.world.item.Items.PAINTING), centerIconX, iconY);
+            } else if (src.isRadar) {
+                int greenLeft = icon1X - 1;
+                int greenRight = icon2X + iconSize + 1;
+                graphics.fill(greenLeft, iconY - 1, greenRight, iconY + iconSize + 1, 0xAA00FF00);
+                int centerIconX = (greenLeft + greenRight) / 2 - 8;
+                var radarItem = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
+                    net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create_radar", "radar_safe_zone_designator"));
+                graphics.renderItem(new ItemStack(radarItem != null ? radarItem : net.minecraft.world.item.Items.COMPASS), centerIconX, iconY);
             } else if (src.dlText != null) {
                 int yellowLeft = icon1X - 1;
                 int yellowRight = icon2X + iconSize + 1;
@@ -194,6 +252,8 @@ public class OmniCoreScreen extends Screen {
             String display;
             if (src.isImage) {
                 display = "[IMG] " + (src.imageFileName != null ? src.imageFileName : src.name);
+            } else if (src.isRadar) {
+                display = "[Radar] (" + src.radarPosX + ", " + src.radarPosY + ")";
             } else if (src.dlText != null) {
                 display = src.name + ": " + src.dlText;
             } else {
@@ -218,6 +278,8 @@ public class OmniCoreScreen extends Screen {
                 int detailBtnX = width - 120;
                 graphics.fill(detailBtnX, y, detailBtnX + 30, y + 20, 0xAA4444AA);
                 graphics.drawString(font, "D", detailBtnX + 11, y + 6, 0xFFFFFF);
+            } else if (src.isRadar) {
+                // 雷达不需要转译按钮，留空
             } else if (src.dlText == null) {
                 int transBtnX = width - 120;
                 graphics.fill(transBtnX, y, transBtnX + 30, y + 20, src.trans ? 0xAAFFA500 : 0xAA555555);
@@ -237,6 +299,17 @@ public class OmniCoreScreen extends Screen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (super.mouseClicked(mouseX, mouseY, button)) return true;
 
+        // 终端选择器点击：循环切换
+        if (!boundTerminalList.isEmpty()) {
+            int selectorX = width - 170;
+            int selectorY = 4;
+            if (mouseX >= selectorX && mouseX <= selectorX + 160 && mouseY >= selectorY && mouseY <= selectorY + 16) {
+                selectedTerminal++;
+                if (selectedTerminal >= boundTerminalList.size()) selectedTerminal = -1;
+                return true;
+            }
+        }
+
         int startY = 20;
         for (int i = 0; i < sources.size(); i++) {
             int y = startY + i * ENTRY_HEIGHT - scrollOffset;
@@ -248,7 +321,7 @@ public class OmniCoreScreen extends Screen {
                 Minecraft.getInstance().setScreen(new ImageDetailScreen(entry));
                 return true;
             }
-            if (!sources.get(i).isImage && sources.get(i).dlText == null && mouseX >= width - 120 && mouseX <= width - 90 && mouseY >= y && mouseY <= y + 20) {
+            if (!sources.get(i).isImage && !sources.get(i).isRadar && sources.get(i).dlText == null && mouseX >= width - 120 && mouseX <= width - 90 && mouseY >= y && mouseY <= y + 20) {
                 final int idx = i;
                 SourceEntry entry = sources.get(idx);
                 TranslationConfig tc = entry.transConfig != null ? entry.transConfig : new TranslationConfig();
@@ -260,7 +333,11 @@ public class OmniCoreScreen extends Screen {
                 return true;
             }
             if (mouseX >= width - 80 && mouseX <= width - 50 && mouseY >= y && mouseY <= y + 20) {
-                PacketDistributor.sendToServer(new SendSourceToTerminalPayload(corePos, i));
+                if (sources.get(i).isRadar) {
+                    PacketDistributor.sendToServer(new PushRadarSlotsPayload(corePos));
+                } else {
+                    PacketDistributor.sendToServer(new SendSourceToTerminalPayload(corePos, i, selectedTerminal));
+                }
                 return true;
             }
             if (mouseX >= width - 40 && mouseX <= width - 10 && mouseY >= y && mouseY <= y + 20) {
@@ -272,7 +349,11 @@ public class OmniCoreScreen extends Screen {
                         Files.deleteIfExists(imgFile);
                     } catch (Exception ignored) {}
                 }
-                PacketDistributor.sendToServer(new RemoveRedstoneSourcePayload(corePos, i));
+                if (entry.isRadar) {
+                    PacketDistributor.sendToServer(new RemoveRadarSlotPayload(corePos, entry.radarIndex));
+                } else {
+                    PacketDistributor.sendToServer(new RemoveRedstoneSourcePayload(corePos, i));
+                }
                 sources.remove(i);
                 return true;
             }
@@ -698,6 +779,12 @@ public class OmniCoreScreen extends Screen {
         UUID imageId;
         String imageFileName;
         byte[] imageData;
+        // 雷达槽位字段
+        boolean isRadar;
+        int radarIndex; // 在服务器 radarSlots 列表中的实际索引
+        int radarPosX, radarPosY;
+        float radarScale, radarRotation;
+        int radarAlpha, radarRange;
 
         SourceEntry(String n, ItemStack i1, ItemStack i2, int s, String disp, String d, BlockPos dp) {
             name = n; freqItem1 = i1; freqItem2 = i2; strength = s; display = disp; dlText = d; dlSourcePos = dp;

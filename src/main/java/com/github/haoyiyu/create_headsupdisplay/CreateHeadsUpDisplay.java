@@ -3,6 +3,7 @@ package com.github.haoyiyu.create_headsupdisplay;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalTarget;
 import com.github.haoyiyu.create_headsupdisplay.block.OmniCoreDisplayTarget;
 import com.github.haoyiyu.create_headsupdisplay.client.HeadMountDisplayClient;
+import com.github.haoyiyu.create_headsupdisplay.integration.RadarIntegration;
 import com.github.haoyiyu.create_headsupdisplay.menu.DisplayTerminalScreen;
 import com.github.haoyiyu.create_headsupdisplay.screen.FrequencySelectionScreen;
 import com.github.haoyiyu.create_headsupdisplay.registration.*;
@@ -50,6 +51,8 @@ public class CreateHeadsUpDisplay {
         event.enqueueWork(() -> {
             DisplayTarget.BY_BLOCK.register(ModBlocks.DISPLAY_TERMINAL.get(), new DisplayTerminalTarget());
             DisplayTarget.BY_BLOCK.register(ModBlocks.OMNI_CORE.get(), new OmniCoreDisplayTarget());
+            // 雷达集成（软依赖，无雷达时安全跳过）
+            RadarIntegration.init();
         });
     }
 

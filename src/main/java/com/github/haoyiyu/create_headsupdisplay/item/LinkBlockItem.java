@@ -16,10 +16,9 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 
 /**
- * 链接方块物品。仿 Create ClickToLinkBlockItem 模式：
- * 1. 右键 OmniCore → 存储核心坐标到物品
- * 2. 右键 Display Terminal → 放置链接方块，自动绑定终端到核心
- * Shift+右键 → 清除已存坐标
+ * 链接方块物品。支持两种连接模式：
+ * 1. OmniCore → Display Terminal（右键核心→右键终端）
+ * 2. OmniCore ← Monitor（右键核心→右键雷达监视器）
  */
 public class LinkBlockItem extends BlockItem {
 
@@ -59,25 +58,45 @@ public class LinkBlockItem extends BlockItem {
             return super.useOn(context);
         }
 
-        // 有已存核心坐标：右键 Terminal → 放置并绑定
+        // 有已存核心坐标：右键终端或监视器
         boolean isTerminal = level.getBlockState(clickedPos).getBlock() instanceof DisplayTerminalBlock;
-        BlockPos terminalPos = isTerminal ? clickedPos : null;
+        boolean isMonitor = isRadarMonitor(level.getBlockEntity(clickedPos));
 
-        // 放置方块
+        if (!isTerminal && !isMonitor) {
+            return super.useOn(context);
+        }
+
+        // 监视器连接：放置 LinkBlock 并绑定（和终端逻辑一致）
+        if (isMonitor) {
+            InteractionResult result = super.useOn(context);
+            if (!level.isClientSide && result.consumesAction()) {
+                BlockPos placePos = clickedPos.relative(context.getClickedFace());
+                BlockEntity placedBe = level.getBlockEntity(placePos);
+                if (placedBe instanceof LinkBlockEntity linkBe) {
+                    linkBe.setOmniCorePos(storedCore);
+                    linkBe.setMonitorPos(clickedPos);
+                    linkBe.onPlaced();
+                }
+                ItemStack remaining = player.getItemInHand(context.getHand());
+                if (!remaining.isEmpty()) {
+                    remaining.remove(ModDataComponents.LINKED_OMNI_CORE_POS.get());
+                }
+                player.displayClientMessage(Component.translatable(
+                    "message.create_headsupdisplay.link_monitor", storedCore.toShortString()), true);
+            }
+            return result;
+        }
+
+        // 终端连接：放置 LinkBlock 并绑定
         InteractionResult result = super.useOn(context);
-
         if (!level.isClientSide && result.consumesAction()) {
-            // 找到刚放置的 LinkBlockEntity（在点击面方向）
             BlockPos placePos = clickedPos.relative(context.getClickedFace());
             BlockEntity placedBe = level.getBlockEntity(placePos);
             if (placedBe instanceof LinkBlockEntity linkBe) {
                 linkBe.setOmniCorePos(storedCore);
-                if (terminalPos != null) {
-                    linkBe.setTerminalPos(terminalPos);
-                    linkBe.onPlaced(); // 通知 OmniCore 绑定
-                }
+                linkBe.setTerminalPos(clickedPos);
+                linkBe.onPlaced();
             }
-            // 清除物品上的坐标（仅消耗放置的那一个物品）
             ItemStack remaining = player.getItemInHand(context.getHand());
             if (!remaining.isEmpty()) {
                 remaining.remove(ModDataComponents.LINKED_OMNI_CORE_POS.get());
@@ -85,5 +104,17 @@ public class LinkBlockItem extends BlockItem {
             player.displayClientMessage(Component.translatable("message.create_headsupdisplay.link_success"), true);
         }
         return result;
+    }
+
+    /** 软检测是否为雷达 Monitor 或 RadarBearing（轴承） */
+    private static boolean isRadarMonitor(BlockEntity be) {
+        if (be == null) return false;
+        try {
+            be.getClass().getMethod("getController");
+            String name = be.getClass().getName();
+            return name.contains("Monitor") || name.contains("RadarBearing");
+        } catch (Exception e) {
+            return false;
+        }
     }
 }

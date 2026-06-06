@@ -61,6 +61,10 @@ public record RequestSourcesDataPayload(BlockPos corePos) implements CustomPacke
                     }
                     data.putBoolean("AutoSort", core.isAutoSortEnabled());
                     data.put("Sources", list);
+                    // 雷达槽位
+                    ListTag radarSlotTag = new ListTag();
+                    for (var slot : core.getRadarSlots()) radarSlotTag.add(slot.serialize());
+                    data.put("RadarSlots", radarSlotTag);
                     PacketDistributor.sendToPlayer(sp, new SyncSourcesDataPayload(data));
                 }
             }

@@ -24,40 +24,53 @@ public class DynamicTextureCache {
     private static final int MAX_PNG_BYTES = 512 * 1024; // 512KB
 
     /**
-     * 获取或创建纹理。
-     * @return 已注册的 ResourceLocation，失败返回 null
+     * 获取或创建纹理（普通图片，缓存后不更新）。
      */
     public static ResourceLocation getOrCreate(UUID imageId, byte[] pngBytes) {
         if (CACHE.containsKey(imageId)) {
             return CACHE.get(imageId);
         }
-
-        // 大小上限保护
-        if (pngBytes == null || pngBytes.length > MAX_PNG_BYTES) {
-            return null;
-        }
-
+        if (pngBytes == null || pngBytes.length > MAX_PNG_BYTES) return null;
         try {
-            // 使用 InputStream 方式读取，避免 NativeImage.read(byte[]) 的栈溢出
             ByteArrayInputStream in = new ByteArrayInputStream(pngBytes);
             NativeImage nativeImage = NativeImage.read(in);
             in.close();
-
             DynamicTexture texture = new DynamicTexture(nativeImage);
-
-            // 记录尺寸
             SIZE_CACHE.put(imageId, new int[]{nativeImage.getWidth(), nativeImage.getHeight()});
-
             ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(
                     "create_headsupdisplay", "dynamic/" + imageId.toString());
             Minecraft.getInstance().getTextureManager().register(loc, texture);
             CACHE.put(imageId, loc);
             return loc;
-        } catch (IOException e) {
-            return null;
-        } catch (OutOfMemoryError e) {
-            return null;
-        }
+        } catch (IOException e) { return null; }
+    }
+
+    /** 更新纹理数据（用于雷达图等实时刷新的图片） */
+    public static ResourceLocation getOrUpdate(UUID imageId, byte[] pngBytes) {
+        if (pngBytes == null || pngBytes.length > MAX_PNG_BYTES) return CACHE.get(imageId);
+        try {
+            ByteArrayInputStream in = new ByteArrayInputStream(pngBytes);
+            NativeImage nativeImage = NativeImage.read(in);
+            in.close();
+            if (CACHE.containsKey(imageId)) {
+                ResourceLocation loc = CACHE.get(imageId);
+                var tex = Minecraft.getInstance().getTextureManager().getTexture(loc);
+                if (tex instanceof DynamicTexture dt) {
+                    dt.setPixels(nativeImage);
+                    dt.upload();
+                }
+                SIZE_CACHE.put(imageId, new int[]{nativeImage.getWidth(), nativeImage.getHeight()});
+                return loc;
+            }
+            // 新建
+            DynamicTexture texture = new DynamicTexture(nativeImage);
+            SIZE_CACHE.put(imageId, new int[]{nativeImage.getWidth(), nativeImage.getHeight()});
+            ResourceLocation loc = ResourceLocation.fromNamespaceAndPath(
+                    "create_headsupdisplay", "dynamic/" + imageId.toString());
+            Minecraft.getInstance().getTextureManager().register(loc, texture);
+            CACHE.put(imageId, loc);
+            return loc;
+        } catch (IOException e) { return CACHE.get(imageId); }
     }
 
     /** 获取已缓存纹理的宽度，-1 表示未缓存 */

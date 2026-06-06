@@ -2,6 +2,7 @@ package com.github.haoyiyu.create_headsupdisplay.block;
 
 import com.github.haoyiyu.create_headsupdisplay.config.DisplaySlot;
 import com.github.haoyiyu.create_headsupdisplay.config.ImageSlot;
+import com.github.haoyiyu.create_headsupdisplay.config.RadarSlot;
 import com.github.haoyiyu.create_headsupdisplay.config.StaticTextSlot;
 import com.github.haoyiyu.create_headsupdisplay.menu.DisplayTerminalMenu;
 import com.github.haoyiyu.create_headsupdisplay.registration.ModBlockEntities;
@@ -36,6 +37,8 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
     private final List<StaticTextSlot> staticTextSlots = new ArrayList<>();
     // 图片槽位（从 OmniCore Send 过来）
     private final Map<UUID, ImageSlot> imageSlots = new LinkedHashMap<>();
+    // 雷达图槽位（由 OmniCore 同步）
+    private final List<RadarSlot> radarSlots = new ArrayList<>();
 
     public DisplayTerminalBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.DISPLAY_TERMINAL_BE.get(), pos, state);
@@ -138,7 +141,7 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
     }
 
     // ========== 同步数据给客户端（头盔） ==========
-    private void syncToBoundPlayers() {
+    public void syncToBoundPlayers() {
         if (level == null || level.isClientSide) return;
 
         // 打包数据源槽位（增加 rotation）
@@ -189,6 +192,12 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
         for (ImageSlot s : imageSlots.values()) imgList.add(s.serialize());
         full.putInt("imageCount", imgList.size());
         for (int i = 0; i < imgList.size(); i++) full.put("image_" + i, imgList.get(i));
+
+        // 雷达图槽位
+        List<CompoundTag> radarList = new ArrayList<>();
+        for (RadarSlot s : radarSlots) radarList.add(s.serialize());
+        full.putInt("radarCount", radarList.size());
+        for (int i = 0; i < radarList.size(); i++) full.put("radar_" + i, radarList.get(i));
 
         // 发送给所有在线玩家
         var syncPayload = new SyncDisplayDataPayload(full);
@@ -247,6 +256,12 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
         for (ImageSlot s : imageSlots.values()) imageTag.add(s.serialize());
         full.put("Images", imageTag);
 
+        // 雷达槽位
+        ListTag radarTag = new ListTag();
+        for (var s : radarSlots) radarTag.add(s.serialize());
+        full.putInt("radarCount", radarTag.size());
+        for (int i = 0; i < radarTag.size(); i++) full.put("radar_" + i, radarTag.getCompound(i));
+
         PacketDistributor.sendToPlayer(player, new OpenTerminalConfigScreenPayload(full));
     }
 
@@ -290,6 +305,13 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
             imageTag.add(slot.serialize());
         }
         tag.put("Images", imageTag);
+
+        // 保存雷达图槽位
+        ListTag radarTag = new ListTag();
+        for (RadarSlot slot : radarSlots) {
+            radarTag.add(slot.serialize());
+        }
+        tag.put("RadarSlots", radarTag);
     }
 
     @Override
@@ -326,6 +348,15 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
             ImageSlot slot = ImageSlot.deserialize(imageTag.getCompound(i));
             imageSlots.put(slot.getImageId(), slot);
         }
+
+        // 加载雷达图槽位
+        radarSlots.clear();
+        if (tag.contains("RadarSlots")) {
+            ListTag radarTag = tag.getList("RadarSlots", net.minecraft.nbt.Tag.TAG_COMPOUND);
+            for (int i = 0; i < radarTag.size(); i++) {
+                radarSlots.add(RadarSlot.deserialize(radarTag.getCompound(i)));
+            }
+        }
     }
 
     public void removeStaticText(int index) {
@@ -344,6 +375,20 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
         imageSlots.put(imageId, slot);
         setChanged();
     }
+
+    /** 只更新图片数据，保留位置/旋转/透明度等配置 */
+    public void updateImageData(UUID imageId, String fileName, byte[] imageData) {
+        if (imageData == null || imageData.length > 512 * 1024) return;
+        ImageSlot existing = imageSlots.get(imageId);
+        if (existing != null) {
+            existing.setFileName(fileName);
+            existing.setImageData(imageData);
+            setChanged();
+            syncToBoundPlayers();
+        } else {
+            addImageSlot(imageId, fileName, imageData);
+        }
+    }
     public void removeImageSlot(UUID imageId) {
         if (imageSlots.remove(imageId) != null) { setChanged(); syncToBoundPlayers(); }
     }
@@ -351,6 +396,15 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
         ImageSlot slot = imageSlots.get(imageId);
         if (slot != null) { slot.setPos(posX, posY); slot.setScale(scale); slot.setRotation(rotation); slot.setAlpha(alpha); setChanged(); syncToBoundPlayers(); }
     }
+
+    // ========== 雷达槽位管理 ==========
+    public void setRadarSlots(List<RadarSlot> slots) {
+        radarSlots.clear();
+        radarSlots.addAll(slots);
+        setChanged();
+        syncToBoundPlayers();
+    }
+    public List<RadarSlot> getRadarSlots() { return radarSlots; }
 
     public void displayData(BlockPos sourcePos, CompoundTag data) {
         String text = data.getString("display_text");

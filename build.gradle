@@ -87,6 +87,16 @@ dependencies {
     compileOnly("dev.engine-room.flywheel:flywheel-neoforge-api-${minecraft_version}:${flywheel_version}")
     runtimeOnly("dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}")
     implementation("com.tterrag.registrate:Registrate:${registrate_version}")
+    // Create Radar: 软依赖（仅编译时需要，运行时可选）
+    def radarFiles = fileTree(dir: 'run/mods', include: 'create_radar-*.jar').files
+    if (!radarFiles.isEmpty()) {
+        compileOnly files(radarFiles)
+        println "  [HUD] Create Radar found, radar integration enabled"
+    } else {
+        // 没有雷达 jar 时排除集成代码，确保编译通过
+        sourceSets.main.java.exclude 'com/github/haoyiyu/create_headsupdisplay/integration/**'
+        println "  [HUD] Create Radar not found, radar integration disabled"
+    }
 }
 
 var generateModMetadata = tasks.register("generateModMetadata", ProcessResources) {

@@ -12,6 +12,7 @@
   "message.create_headsupdisplay.link_set": "已连接到位于 %s 的万物互联核心",
   "message.create_headsupdisplay.link_clear": "已清除连接的万物互联核心",
   "message.create_headsupdisplay.link_success": "终端已绑定到万物互联核心",
+  "message.create_headsupdisplay.link_monitor": "雷达监视器已绑定到位于 %s 的万物互联核心",
   "message.create_headsupdisplay.source_sent": "信号源已发送到终端",
 
   "gui.create_headsupdisplay.omni_core.title": "万物互联核心",

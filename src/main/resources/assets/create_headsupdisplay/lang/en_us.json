@@ -12,6 +12,7 @@
   "message.create_headsupdisplay.link_set": "Linked to Omni Core at %s",
   "message.create_headsupdisplay.link_clear": "Cleared linked Omni Core",
   "message.create_headsupdisplay.link_success": "Bound terminal to Omni Core",
+  "message.create_headsupdisplay.link_monitor": "Radar Monitor bound to Omni Core at %s",
   "message.create_headsupdisplay.source_sent": "Source sent to terminal",
 
   "gui.create_headsupdisplay.omni_core.title": "Omni Core",

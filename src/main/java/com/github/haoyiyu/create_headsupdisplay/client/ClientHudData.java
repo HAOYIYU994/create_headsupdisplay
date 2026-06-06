@@ -18,6 +18,13 @@ public class ClientHudData {
     private static List<StaticTextRenderData> staticTexts = new ArrayList<>();
     private static List<ImageRenderData> images = new ArrayList<>();
 
+    // 雷达数据
+    private static List<RadarRenderData> radarSlots = new ArrayList<>();
+    private static List<com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.RadarTrackEntry> radarTracks = new ArrayList<>();
+    private static float radarSweepAngle = 0f;
+    private static float radarGlobalRange = 50f;
+    private static double radarX, radarY, radarZ;
+
     public static void updateConfig(HudPositionConfig config) {
         currentConfig = config;
     }
@@ -82,6 +89,21 @@ public class ClientHudData {
                 images.add(new ImageRenderData(imageId, imageBytes, fileName, posX, posY, scale, rotation, alpha));
                 DynamicTextureCache.getOrCreate(imageId, imageBytes);
             }
+        }
+
+        // 解析雷达图槽位
+        radarSlots.clear();
+        if (data.contains("radarCount")) {
+            int radarCount = data.getInt("radarCount");
+            for (int i = 0; i < radarCount; i++) {
+                CompoundTag tag = data.getCompound("radar_" + i);
+                radarSlots.add(new RadarRenderData(
+                    tag.getInt("PosX"), tag.getInt("PosY"),
+                    tag.getFloat("Scale"), tag.getFloat("Rotation"),
+                    tag.getInt("Alpha"), tag.getInt("RadarRange")
+                ));
+            }
+            System.out.println("[HUD] Received " + radarCount + " radar slots, tracks=" + radarTracks.size());
         }
     }
 
@@ -164,6 +186,55 @@ public class ClientHudData {
             this.scale = scale;
             this.rotation = rotation;
             this.alpha = alpha;
+        }
+    }
+
+    // ========== 雷达数据 ==========
+
+    /** 更新雷达轨迹+扫描角度+雷达坐标 */
+    public static void updateRadarTracks(
+            List<com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.RadarTrackEntry> tracks,
+            float sweepAngle, float range, double rX, double rY, double rZ) {
+        radarTracks = tracks;
+        radarSweepAngle = sweepAngle;
+        radarGlobalRange = range;
+        radarX = rX;
+        radarY = rY;
+        radarZ = rZ;
+    }
+
+    public static float getRadarSweepAngle() { return radarSweepAngle; }
+    public static float getRadarGlobalRange() { return radarGlobalRange; }
+    public static double getRadarX() { return radarX; }
+    public static double getRadarY() { return radarY; }
+    public static double getRadarZ() { return radarZ; }
+
+    /** 更新雷达槽位配置（由 OpenOmniCoreScreenPayload 触发） */
+    public static void updateRadarSlots(List<RadarRenderData> slots) {
+        radarSlots = slots;
+    }
+
+    public static List<RadarRenderData> getRadarSlots() { return radarSlots; }
+
+    public static List<com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.RadarTrackEntry> getRadarTracks() {
+        return radarTracks;
+    }
+
+    /** 雷达槽位渲染数据 */
+    public static class RadarRenderData {
+        public final int posX, posY;
+        public final float scale;
+        public final float rotation;
+        public final int alpha;
+        public final int radarRange;
+
+        public RadarRenderData(int posX, int posY, float scale, float rotation, int alpha, int range) {
+            this.posX = posX;
+            this.posY = posY;
+            this.scale = scale;
+            this.rotation = rotation;
+            this.alpha = alpha;
+            this.radarRange = range;
         }
     }
 }

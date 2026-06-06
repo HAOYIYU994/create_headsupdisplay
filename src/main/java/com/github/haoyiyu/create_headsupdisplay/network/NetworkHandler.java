@@ -202,5 +202,48 @@ public class NetworkHandler {
                 OpenFrequencySelectionPayload::handle
         );
 
+        // 推送雷达槽位到终端（客户端 -> 服务端）
+        registrar.playToServer(
+                PushRadarSlotsPayload.TYPE,
+                PushRadarSlotsPayload.CODEC,
+                PushRadarSlotsPayload::handle
+        );
+
+        // 扫描附近雷达 Monitor（客户端 -> 服务端）
+        registrar.playToServer(
+                ScanRadarPayload.TYPE,
+                ScanRadarPayload.CODEC,
+                ScanRadarPayload::handle
+        );
+
+        // ========== 雷达系统网络包 ==========
+        // 同步雷达轨迹数据（服务端 -> 客户端）
+        registrar.playToClient(
+                SyncRadarDataPayload.TYPE,
+                SyncRadarDataPayload.CODEC,
+                (payload, context) -> context.enqueueWork(() -> ClientHudData.updateRadarTracks(payload.tracks(), payload.sweepAngle(), payload.radarRange(), payload.radarX(), payload.radarY(), payload.radarZ()))
+        );
+
+        // 添加雷达槽位（客户端 -> 服务端）
+        registrar.playToServer(
+                AddRadarSlotPayload.TYPE,
+                AddRadarSlotPayload.CODEC,
+                AddRadarSlotPayload::handle
+        );
+
+        // 删除雷达槽位（客户端 -> 服务端）
+        registrar.playToServer(
+                RemoveRadarSlotPayload.TYPE,
+                RemoveRadarSlotPayload.CODEC,
+                RemoveRadarSlotPayload::handle
+        );
+
+        // 更新雷达槽位（客户端 -> 服务端）
+        registrar.playToServer(
+                UpdateRadarSlotPayload.TYPE,
+                UpdateRadarSlotPayload.CODEC,
+                UpdateRadarSlotPayload::handle
+        );
+
     }
 }
