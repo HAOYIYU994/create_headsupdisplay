@@ -91,39 +91,7 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
 
         int renderedCount = 0;
 
-        // 初始化字体 buffer consumer
-        font.drawInBatch(" ", 0, 0, 0x00000000, false, pose.last().pose(), buffer, Font.DisplayMode.NORMAL, 0, light);
-
-        // --- 渲染动态槽位 ---
-        if (slots != null) {
-            for (var slot : slots) {
-                float dx = slot.posX * scaleX;
-                float dy = slot.posY * scaleY;
-                if (!inRegion(dx, dy, regionLeft, regionRight, regionTop, regionBottom)) continue;
-
-                renderText(pose, buffer, font, slot.text, dx, dy, slot.scale, slot.color, slot.alpha, light);
-                renderedCount++;
-            }
-        }
-
-        // --- 渲染静态文本 ---
-        if (staticTexts != null) {
-            for (var st : staticTexts) {
-                float dx = st.posX * scaleX;
-                float dy = st.posY * scaleY;
-                if (!inRegion(dx, dy, regionLeft, regionRight, regionTop, regionBottom)) continue;
-
-                renderText(pose, buffer, font, st.text, dx, dy, st.scale, st.color, st.alpha, light);
-                renderedCount++;
-            }
-        }
-
-        // 结束批处理
-        if (buffer instanceof MultiBufferSource.BufferSource bs) {
-            bs.endBatch();
-        }
-
-        // --- 渲染图片（Tessellator，只用到 POSITION_COLOR_TEX） ---
+        // --- 渲染图片（底层，Tessellator） ---
         var images = ClientHudData.getImages();
         if (images != null && !images.isEmpty()) {
             for (var img : images) {
@@ -141,6 +109,38 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
                     }
                 }
             }
+        }
+
+        // 初始化字体 buffer consumer
+        font.drawInBatch(" ", 0, 0, 0x00000000, false, pose.last().pose(), buffer, Font.DisplayMode.NORMAL, 0, light);
+
+        // --- 渲染动态槽位（顶层） ---
+        if (slots != null) {
+            for (var slot : slots) {
+                float dx = slot.posX * scaleX;
+                float dy = slot.posY * scaleY;
+                if (!inRegion(dx, dy, regionLeft, regionRight, regionTop, regionBottom)) continue;
+
+                renderText(pose, buffer, font, slot.text, dx, dy, slot.scale, slot.color, slot.alpha, light);
+                renderedCount++;
+            }
+        }
+
+        // --- 渲染静态文本（顶层） ---
+        if (staticTexts != null) {
+            for (var st : staticTexts) {
+                float dx = st.posX * scaleX;
+                float dy = st.posY * scaleY;
+                if (!inRegion(dx, dy, regionLeft, regionRight, regionTop, regionBottom)) continue;
+
+                renderText(pose, buffer, font, st.text, dx, dy, st.scale, st.color, st.alpha, light);
+                renderedCount++;
+            }
+        }
+
+        // 结束批处理
+        if (buffer instanceof MultiBufferSource.BufferSource bs) {
+            bs.endBatch();
         }
 
         pose.popPose();

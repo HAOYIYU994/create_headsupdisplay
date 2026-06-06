@@ -29,7 +29,33 @@ public class HudOverlayRenderer {
         GuiGraphics graphics = event.getGuiGraphics();
         var font = mc.font;
 
-        // 渲染数据源槽位（动态数据，来自显示连接器）
+        // 渲染图片槽位（底层）
+        var images = ClientHudData.getImages();
+        if (images != null && !images.isEmpty()) {
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
+            for (var img : images) {
+                graphics.pose().pushPose();
+                graphics.pose().translate(img.posX, img.posY, 0);
+                graphics.pose().scale(img.scale, img.scale, 1.0f);
+                graphics.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(img.rotation));
+
+                ResourceLocation tex = DynamicTextureCache.getOrCreate(img.imageId, img.imageData);
+                if (tex != null) {
+                    int w = DynamicTextureCache.getWidth(img.imageId);
+                    int h = DynamicTextureCache.getHeight(img.imageId);
+                    if (w > 0 && h > 0) {
+                        RenderSystem.setShaderColor(1f, 1f, 1f, img.alpha / 255f);
+                        graphics.blit(tex, 0, 0, 0, 0, w, h, w, h);
+                    }
+                }
+                graphics.pose().popPose();
+            }
+            RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+            RenderSystem.disableBlend();
+        }
+
+        // 渲染数据源槽位（顶层）
         var slots = ClientHudData.getSlots();
         if (slots != null) {
             for (ClientHudData.SlotRenderData slot : slots) {
@@ -42,7 +68,6 @@ public class HudOverlayRenderer {
 
                 String text = slot.text.replaceAll("§[0-9a-fk-or]", "");
                 if (slot.displayLine == 2) {
-                    // 进度条模式
                     String[] parts = text.split("/");
                     if (parts.length == 2) {
                         try {
@@ -68,7 +93,6 @@ public class HudOverlayRenderer {
                         graphics.drawString(font, text, 0, 0, textColor, true);
                     }
                 } else {
-                    // 纯文本模式
                     graphics.drawString(font, text, 0, 0, textColor, true);
                 }
 
@@ -76,7 +100,7 @@ public class HudOverlayRenderer {
             }
         }
 
-        // 渲染静态文本槽位（支持透明度）
+        // 渲染静态文本槽位（顶层）
         var staticSlots = ClientHudData.getStaticTextSlots();
         if (staticSlots != null && !staticSlots.isEmpty()) {
             for (var slot : staticSlots) {
@@ -84,37 +108,10 @@ public class HudOverlayRenderer {
                 graphics.pose().translate(slot.posX, slot.posY, 0);
                 graphics.pose().scale(slot.scale, slot.scale, 1.0f);
                 graphics.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(slot.rotation));
-                // 合成 ARGB 颜色
                 int argb = (slot.alpha << 24) | (slot.color & 0x00FFFFFF);
                 graphics.drawString(font, slot.text.replaceAll("§[0-9a-fk-or]", ""), 0, 0, argb, false);
                 graphics.pose().popPose();
             }
-        }
-
-        // 渲染图片槽位
-        var images = ClientHudData.getImages();
-        if (images != null && !images.isEmpty()) {
-            RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
-            for (var img : images) {
-                graphics.pose().pushPose();
-                graphics.pose().translate(img.posX, img.posY, 0);
-                graphics.pose().scale(img.scale, img.scale, 1.0f);
-                graphics.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(img.rotation));
-
-                ResourceLocation tex = DynamicTextureCache.getOrCreate(img.imageId, img.imageData);
-                if (tex != null) {
-                    int w = DynamicTextureCache.getWidth(img.imageId);
-                    int h = DynamicTextureCache.getHeight(img.imageId);
-                    if (w > 0 && h > 0) {
-                        RenderSystem.setShaderColor(1f, 1f, 1f, img.alpha / 255f);
-                        graphics.blit(tex, 0, 0, 0, 0, w, h, w, h);
-                    }
-                }
-                graphics.pose().popPose();
-            }
-            RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
-            RenderSystem.disableBlend();
         }
     }
 }
