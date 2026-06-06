@@ -75,7 +75,7 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
                 .center()
                 .rotateYDegrees(AngleHelper.horizontalAngle(facing))
                 .uncenter()
-                .translate(0, 0, 0.01f);
+                .translate(0, 0, -0.0667f);
 
         pose.translate(0, 1, 1);
         pose.scale(1f / 32f, 1f / 32f, 1f / 32f);

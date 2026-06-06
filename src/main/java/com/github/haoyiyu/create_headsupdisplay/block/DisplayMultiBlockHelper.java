@@ -79,11 +79,21 @@ public class DisplayMultiBlockHelper {
         Direction facing = ctrlState.getValue(FACING);
         Direction right = facing.getClockWise();
         BlockState baseState = ModBlocks.DISPLAY.get().defaultBlockState().setValue(FACING, facing);
-        BlockPos oldTerminal = null;
-        for (int i = 0; i < h; i++)
-            for (int j = 0; j < w; j++)
-                if (level.getBlockEntity(controllerPos.above(i).relative(right, j)) instanceof DisplayBlockEntity be && be.getBoundTerminal() != null)
-                    oldTerminal = be.getBoundTerminal();
+        // 从控制方块自动绑定相邻终端
+        BlockPos term = null;
+        for (Direction d : net.minecraft.core.Direction.values()) {
+            BlockPos n = controllerPos.relative(d);
+            if (level.getBlockEntity(n) instanceof com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlockEntity) {
+                term = n; break;
+            }
+        }
+        // 回退：扫描已存在的绑定
+        if (term == null) {
+            for (int i = 0; i < h; i++)
+                for (int j = 0; j < w; j++)
+                    if (level.getBlockEntity(controllerPos.above(i).relative(right, j)) instanceof DisplayBlockEntity be && be.getBoundTerminal() != null)
+                        term = be.getBoundTerminal();
+        }
         for (int i = 0; i < h; i++) {
             for (int j = 0; j < w; j++) {
                 DisplayBlock.Shape shape = shapeFor(i, j, w, h);
@@ -91,8 +101,8 @@ public class DisplayMultiBlockHelper {
                 level.setBlockAndUpdate(pos, baseState.setValue(SHAPE, shape));
                 if (level.getBlockEntity(pos) instanceof DisplayBlockEntity be) {
                     be.setControllerPos(controllerPos, w, h);
-                    if (oldTerminal != null)
-                        be.setBoundTerminal(oldTerminal);
+                    if (term != null)
+                        be.setBoundTerminal(term);
                 }
             }
         }

@@ -169,7 +169,8 @@ public class OmniCoreScreen extends Screen {
                 int purpleLeft = icon1X - 1;
                 int purpleRight = icon2X + iconSize + 1;
                 graphics.fill(purpleLeft, iconY - 1, purpleRight, iconY + iconSize + 1, 0xAAFF00FF);
-                graphics.renderItem(new ItemStack(net.minecraft.world.item.Items.PAINTING), icon1X, iconY);
+                int centerIconX = (purpleLeft + purpleRight) / 2 - 8;
+                graphics.renderItem(new ItemStack(net.minecraft.world.item.Items.PAINTING), centerIconX, iconY);
             } else if (src.dlText != null) {
                 int yellowLeft = icon1X - 1;
                 int yellowRight = icon2X + iconSize + 1;
@@ -199,9 +200,25 @@ public class OmniCoreScreen extends Screen {
                 display = src.name + ": " + src.display;
             }
             display = display.replaceAll("§[0-9a-fk-or]", "");
-            graphics.drawString(font, display, startX, y + 5, 0xFFFFFF);
+            // 超长文本滚动显示
+            int maxTextWidth = (width - 120) - startX - 4;
+            int textWidth = font.width(display);
+            if (textWidth > maxTextWidth) {
+                int scrollSpeed = 1;
+                int scrollMax = textWidth - maxTextWidth + 20;
+                int offset = (tickCounter * scrollSpeed) % scrollMax;
+                graphics.enableScissor(startX, y, width - 120, y + ENTRY_HEIGHT);
+                graphics.drawString(font, display, startX - offset, y + 5, 0xFFFFFF);
+                graphics.disableScissor();
+            } else {
+                graphics.drawString(font, display, startX, y + 5, 0xFFFFFF);
+            }
 
-            if (!src.isImage) {
+            if (src.isImage) {
+                int detailBtnX = width - 120;
+                graphics.fill(detailBtnX, y, detailBtnX + 30, y + 20, 0xAA4444AA);
+                graphics.drawString(font, "D", detailBtnX + 11, y + 6, 0xFFFFFF);
+            } else if (src.dlText == null) {
                 int transBtnX = width - 120;
                 graphics.fill(transBtnX, y, transBtnX + 30, y + 20, src.trans ? 0xAAFFA500 : 0xAA555555);
                 graphics.drawString(font, "T", transBtnX + 11, y + 6, 0xFFFFFF);
@@ -224,7 +241,14 @@ public class OmniCoreScreen extends Screen {
         for (int i = 0; i < sources.size(); i++) {
             int y = startY + i * ENTRY_HEIGHT - scrollOffset;
             if (y < 0 || y > height) continue;
-            if (!sources.get(i).isImage && mouseX >= width - 120 && mouseX <= width - 90 && mouseY >= y && mouseY <= y + 20) {
+            // IMAGE 详情按钮
+            if (sources.get(i).isImage && mouseX >= width - 120 && mouseX <= width - 90 && mouseY >= y && mouseY <= y + 20) {
+                final int idx = i;
+                SourceEntry entry = sources.get(idx);
+                Minecraft.getInstance().setScreen(new ImageDetailScreen(entry));
+                return true;
+            }
+            if (!sources.get(i).isImage && sources.get(i).dlText == null && mouseX >= width - 120 && mouseX <= width - 90 && mouseY >= y && mouseY <= y + 20) {
                 final int idx = i;
                 SourceEntry entry = sources.get(idx);
                 TranslationConfig tc = entry.transConfig != null ? entry.transConfig : new TranslationConfig();
@@ -240,6 +264,14 @@ public class OmniCoreScreen extends Screen {
                 return true;
             }
             if (mouseX >= width - 40 && mouseX <= width - 10 && mouseY >= y && mouseY <= y + 20) {
+                // IMAGE 源：删除本地图片文件
+                SourceEntry entry = sources.get(i);
+                if (entry.isImage && entry.imageFileName != null) {
+                    try {
+                        Path imgFile = getImageFolder().resolve(entry.imageFileName);
+                        Files.deleteIfExists(imgFile);
+                    } catch (Exception ignored) {}
+                }
                 PacketDistributor.sendToServer(new RemoveRedstoneSourcePayload(corePos, i));
                 sources.remove(i);
                 return true;
@@ -268,7 +300,7 @@ public class OmniCoreScreen extends Screen {
 
     /** 客户端图片文件夹 */
     static Path getImageFolder() {
-        Path dir = Paths.get("run", "create_headsupdisplay_images");
+        Path dir = net.neoforged.fml.loading.FMLPaths.GAMEDIR.get().resolve("create_headsupdisplay_images");
         try { Files.createDirectories(dir); } catch (Exception ignored) {}
         return dir;
     }
@@ -602,6 +634,51 @@ public class OmniCoreScreen extends Screen {
                 s = s.substring(0, s.length() - 1);
             }
             return s + "...";
+        }
+    }
+
+    // ========== 图片详情子菜单 ==========
+
+    private class ImageDetailScreen extends Screen {
+        private final SourceEntry entry;
+
+        ImageDetailScreen(SourceEntry entry) {
+            super(Component.literal(entry.imageFileName != null ? entry.imageFileName : "Image"));
+            this.entry = entry;
+        }
+
+        @Override
+        protected void init() {
+            addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.back"), b -> {
+                Minecraft.getInstance().setScreen(OmniCoreScreen.this);
+            }).bounds(10, height - 30, 60, 20).build());
+        }
+
+        @Override
+        public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
+            renderBackground(graphics, mouseX, mouseY, partialTick);
+            super.render(graphics, mouseX, mouseY, partialTick);
+
+            int cx = width / 2;
+            graphics.drawCenteredString(font, entry.imageFileName, cx, 10, 0xFFFFFF);
+
+            ResourceLocation tex = DynamicTextureCache.getOrCreate(entry.imageId, entry.imageData);
+            if (tex != null) {
+                int iw = DynamicTextureCache.getWidth(entry.imageId);
+                int ih = DynamicTextureCache.getHeight(entry.imageId);
+                if (iw > 0 && ih > 0) {
+                    int maxW = width - 40;
+                    int maxH = height - 60;
+                    float fit = Math.min((float) maxW / iw, (float) maxH / ih);
+                    int dw = (int) (iw * fit);
+                    int dh = (int) (ih * fit);
+                    int dx = (width - dw) / 2;
+                    int dy = 30 + (maxH - dh) / 2;
+                    RenderSystem.enableBlend();
+                    graphics.blit(tex, dx, dy, 0, 0, dw, dh, dw, dh);
+                    RenderSystem.disableBlend();
+                }
+            }
         }
     }
 

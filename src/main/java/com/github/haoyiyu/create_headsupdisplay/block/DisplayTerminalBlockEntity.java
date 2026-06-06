@@ -283,6 +283,13 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
             staticTag.add(st);
         }
         tag.put("StaticTexts", staticTag);
+
+        // 保存图片槽位
+        ListTag imageTag = new ListTag();
+        for (ImageSlot slot : imageSlots.values()) {
+            imageTag.add(slot.serialize());
+        }
+        tag.put("Images", imageTag);
     }
 
     @Override
@@ -311,6 +318,14 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
             float rotation = st.getFloat("rotation");
             staticTextSlots.add(new StaticTextSlot(text, posX, posY, scale, rotation, color, alpha));
         }
+
+        // 加载图片槽位
+        imageSlots.clear();
+        ListTag imageTag = tag.getList("Images", net.minecraft.nbt.Tag.TAG_COMPOUND);
+        for (int i = 0; i < imageTag.size(); i++) {
+            ImageSlot slot = ImageSlot.deserialize(imageTag.getCompound(i));
+            imageSlots.put(slot.getImageId(), slot);
+        }
     }
 
     public void removeStaticText(int index) {
@@ -330,7 +345,7 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
         setChanged();
     }
     public void removeImageSlot(UUID imageId) {
-        if (imageSlots.remove(imageId) != null) setChanged();
+        if (imageSlots.remove(imageId) != null) { setChanged(); syncToBoundPlayers(); }
     }
     public void updateImageConfig(UUID imageId, int posX, int posY, float scale, float rotation, int alpha) {
         ImageSlot slot = imageSlots.get(imageId);
