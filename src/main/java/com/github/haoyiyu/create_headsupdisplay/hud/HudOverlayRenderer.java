@@ -6,6 +6,7 @@ import com.github.haoyiyu.create_headsupdisplay.item.HeadMountDisplayItem;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
@@ -27,13 +28,14 @@ public class HudOverlayRenderer {
 
         ItemStack helmet = player.getInventory().armor.get(3);
         if (!(helmet.getItem() instanceof HeadMountDisplayItem)) return;
-        if (HeadMountDisplayItem.getBoundTerminalPos(helmet) == null) return;
+        BlockPos boundTerminal = HeadMountDisplayItem.getBoundTerminalPos(helmet);
+        if (boundTerminal == null) return;
 
         GuiGraphics graphics = event.getGuiGraphics();
         var font = mc.font;
 
         // 图片槽位
-        var images = ClientHudData.getImages();
+        var images = ClientHudData.getImagesFor(boundTerminal);
         if (images != null && !images.isEmpty()) {
             RenderSystem.enableBlend();
             RenderSystem.defaultBlendFunc();
@@ -58,7 +60,7 @@ public class HudOverlayRenderer {
         }
 
         // 雷达图槽位
-        var radarSlots = ClientHudData.getRadarSlots();
+        var radarSlots = ClientHudData.getRadarSlotsFor(boundTerminal);
         var radarTracks = ClientHudData.getRadarTracks();
         if (radarSlots != null && !radarSlots.isEmpty() && mc.player != null) {
             for (var slot : radarSlots) {
@@ -67,7 +69,7 @@ public class HudOverlayRenderer {
         }
 
         // 数据源槽位
-        var slots = ClientHudData.getSlots();
+        var slots = ClientHudData.getSlotsFor(boundTerminal);
         if (slots != null) {
             for (var slot : slots) {
                 graphics.pose().pushPose();
@@ -107,7 +109,7 @@ public class HudOverlayRenderer {
         }
 
         // 静态文本槽位
-        var staticSlots = ClientHudData.getStaticTextSlots();
+        var staticSlots = ClientHudData.getStaticTextsFor(boundTerminal);
         if (staticSlots != null && !staticSlots.isEmpty()) {
             for (var slot : staticSlots) {
                 graphics.pose().pushPose();

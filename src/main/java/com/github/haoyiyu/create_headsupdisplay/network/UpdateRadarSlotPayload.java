@@ -41,7 +41,7 @@ public record UpdateRadarSlotPayload(BlockPos corePos, int index, int posX, int 
                     slot.setAlpha(payload.alpha);
                     slot.setRadarRange(payload.range);
                     terminal.setChanged();
-                    terminal.syncToBoundPlayers(); // 立即同步到 HUD
+                    terminal.syncToBoundPlayers();
                 }
             }
         });

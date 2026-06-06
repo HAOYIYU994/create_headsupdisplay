@@ -50,7 +50,6 @@ public class OmniCoreBlockEntity extends BlockEntity {
         if (!boundTerminals.contains(pos)) {
             boundTerminals.add(pos);
         }
-        if (!radarSlots.isEmpty()) pushRadarSlotsToTerminal();
         setChanged();
     }
 
@@ -71,7 +70,6 @@ public class OmniCoreBlockEntity extends BlockEntity {
             slot.setRadarRange(50);
             radarSlots.add(slot);
         }
-        pushRadarSlotsToTerminal();
         setChanged();
         CreateHeadsUpDisplay.LOGGER.info("OMNI linkedMonitor SET to {}", pos);
     }
@@ -476,38 +474,40 @@ public class OmniCoreBlockEntity extends BlockEntity {
         // 第二步：更新所有已绑定终端上已发送的槽位数据
         if (be.boundTerminals.isEmpty()) return;
 
+        var toRemove = new ArrayList<Integer>();
         var sentIndices = new java.util.ArrayList<>(be.sentSources.keySet());
-        for (BlockPos tp : be.boundTerminals) {
-            BlockEntity terminalBe = level.getBlockEntity(tp);
-            if (!(terminalBe instanceof DisplayTerminalBlockEntity terminal)) continue;
+        for (int idx : sentIndices) {
+            BlockPos virtualPos = be.sentSources.get(idx);
+            if (virtualPos == null || idx < 0 || idx >= be.sources.size()) {
+                toRemove.add(idx);
+                continue;
+            }
+            RedstoneSource src = be.sources.get(idx);
+            String newText = null;
+            if (src.sourceType == RedstoneSource.Type.DISPLAY_LINK) {
+                newText = src.displayLinkText;
+            } else if (src.sourceType == RedstoneSource.Type.REDSTONE) {
+                newText = be.getDisplayText(src);
+            }
+            if (newText == null) continue;
 
-            for (int idx : sentIndices) {
-                BlockPos virtualPos = be.sentSources.get(idx);
-                if (virtualPos == null) continue;
-                if (idx < 0 || idx >= be.sources.size()) {
-                    be.sentSources.remove(idx);
-                    continue;
-                }
-                if (terminal.getSlot(virtualPos) == null) {
-                    be.sentSources.remove(idx);
-                    continue;
-                }
-                RedstoneSource src = be.sources.get(idx);
-                String newText;
-                if (src.sourceType == RedstoneSource.Type.DISPLAY_LINK) {
-                    newText = src.displayLinkText;
-                } else if (src.sourceType == RedstoneSource.Type.REDSTONE) {
-                    newText = be.getDisplayText(src);
-                } else {
-                    continue;
-                }
-                if (newText == null) continue;
-                if (!newText.equals(src.lastSentText)) {
-                    src.lastSentText = newText;
-                    terminal.updateSlotData(virtualPos, newText);
+            boolean foundAny = false;
+            for (BlockPos tp : be.boundTerminals) {
+                BlockEntity terminalBe = level.getBlockEntity(tp);
+                if (terminalBe instanceof DisplayTerminalBlockEntity terminal && terminal.getSlot(virtualPos) != null) {
+                    foundAny = true;
+                    if (!newText.equals(src.lastSentText)) {
+                        terminal.updateSlotData(virtualPos, newText);
+                    }
                 }
             }
+            if (foundAny) {
+                src.lastSentText = newText;
+            } else {
+                toRemove.add(idx);
+            }
         }
+        for (int idx : toRemove) be.sentSources.remove(idx);
     }
 
     /** 将指定索引的源移到列表最顶部，同时重映射 sentSources */

@@ -29,7 +29,6 @@ public record SendSourceToTerminalPayload(BlockPos corePos, int sourceIndex, int
                 if (be instanceof OmniCoreBlockEntity core) {
                     core.sendToTerminal(payload.sourceIndex, payload.terminalIndex);
                     sp.displayClientMessage(net.minecraft.network.chat.Component.translatable("message.create_headsupdisplay.source_sent"), true);
-                    core.openConfigScreen(sp);
                 }
             }
         });

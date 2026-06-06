@@ -9,21 +9,13 @@ import net.neoforged.api.distmarker.OnlyIn;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 @OnlyIn(Dist.CLIENT)
 public class ClientHudData {
     private static HudPositionConfig currentConfig = HudPositionConfig.defaultConfig();
-    private static CompoundTag currentDisplayData = new CompoundTag();
-    private static List<SlotRenderData> slots = new ArrayList<>();
-    private static List<StaticTextRenderData> staticTexts = new ArrayList<>();
-    private static List<ImageRenderData> images = new ArrayList<>();
-
-    // 雷达数据
-    private static List<RadarRenderData> radarSlots = new ArrayList<>();
-    private static List<com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.RadarTrackEntry> radarTracks = new ArrayList<>();
-    private static float radarSweepAngle = 0f;
-    private static float radarGlobalRange = 50f;
-    private static double radarX, radarY, radarZ;
+    private static final Map<BlockPos, TerminalData> dataByTerminal = new ConcurrentHashMap<>();
 
     public static void updateConfig(HudPositionConfig config) {
         currentConfig = config;
@@ -33,97 +25,83 @@ public class ClientHudData {
         return currentConfig;
     }
 
+    /** 接收终端同步数据，按终端隔离存储 */
     public static void updateDisplayData(CompoundTag data) {
-        currentDisplayData = data;
-        slots.clear();
-        staticTexts.clear();
+        BlockPos terminalPos = data.contains("TerminalPos")
+                ? BlockPos.of(data.getLong("TerminalPos")) : BlockPos.ZERO;
 
-        // 解析数据源槽位
-        if (data.contains("slotCount")) {
-            int count = data.getInt("slotCount");
-            for (int i = 0; i < count; i++) {
-                CompoundTag slotTag = data.getCompound("slot_" + i);
-                BlockPos sourcePos = BlockPos.of(slotTag.getLong("sourcePos"));
-                int posX = slotTag.getInt("posX");
-                int posY = slotTag.getInt("posY");
-                float scale = slotTag.getFloat("scale");
-                String text = slotTag.getString("text");
-                int displayLine = slotTag.getInt("displayLine");
-                float rotation = slotTag.getFloat("rotation");
-                int color = slotTag.getInt("color");
-                int alpha = slotTag.getInt("alpha");
-                slots.add(new SlotRenderData(sourcePos, posX, posY, scale, text, displayLine, rotation, color, alpha));
-            }
-        }
-
-        // 解析静态文本槽位
-        if (data.contains("staticCount")) {
-            int staticCount = data.getInt("staticCount");
-            for (int i = 0; i < staticCount; i++) {
-                CompoundTag tag = data.getCompound("static_" + i);
-                String text = tag.getString("text");
-                int posX = tag.getInt("posX");
-                int posY = tag.getInt("posY");
-                float scale = tag.getFloat("scale");
-                float rotation = tag.getFloat("rotation");
-                int color = tag.getInt("color");
-                int alpha = tag.getInt("alpha");
-                staticTexts.add(new StaticTextRenderData(text, posX, posY, scale, rotation, color, alpha));
-            }
-        }
-
-        // 解析图片槽位
-        images.clear();
-        if (data.contains("imageCount")) {
-            int imageCount = data.getInt("imageCount");
-            for (int i = 0; i < imageCount; i++) {
-                CompoundTag tag = data.getCompound("image_" + i);
-                UUID imageId = tag.getUUID("ImageId");
-                String fileName = tag.getString("FileName");
-                byte[] imageBytes = tag.getByteArray("ImageData");
-                int posX = tag.getInt("PosX");
-                int posY = tag.getInt("PosY");
-                float scale = tag.getFloat("Scale");
-                float rotation = tag.getFloat("Rotation");
-                int alpha = tag.getInt("Alpha");
-                images.add(new ImageRenderData(imageId, imageBytes, fileName, posX, posY, scale, rotation, alpha));
-                DynamicTextureCache.getOrCreate(imageId, imageBytes);
-            }
-        }
-
-        // 解析雷达图槽位
-        radarSlots.clear();
-        if (data.contains("radarCount")) {
-            int radarCount = data.getInt("radarCount");
-            for (int i = 0; i < radarCount; i++) {
-                CompoundTag tag = data.getCompound("radar_" + i);
-                radarSlots.add(new RadarRenderData(
-                    tag.getInt("PosX"), tag.getInt("PosY"),
-                    tag.getFloat("Scale"), tag.getFloat("Rotation"),
-                    tag.getInt("Alpha"), tag.getInt("RadarRange")
-                ));
-            }
-            System.out.println("[HUD] Received " + radarCount + " radar slots, tracks=" + radarTracks.size());
-        }
+        TerminalData td = dataByTerminal.computeIfAbsent(terminalPos, k -> new TerminalData());
+        td.update(data);
     }
 
-    public static CompoundTag getCurrentDisplayData() {
-        return currentDisplayData;
+    /** 获取指定终端的槽位数据 */
+    public static List<SlotRenderData> getSlotsFor(BlockPos terminal) {
+        TerminalData td = dataByTerminal.get(terminal);
+        return td != null ? td.slots : List.of();
     }
 
+    /** 获取指定终端的静态文本 */
+    public static List<StaticTextRenderData> getStaticTextsFor(BlockPos terminal) {
+        TerminalData td = dataByTerminal.get(terminal);
+        return td != null ? td.staticTexts : List.of();
+    }
+
+    /** 获取指定终端的图片 */
+    public static List<ImageRenderData> getImagesFor(BlockPos terminal) {
+        TerminalData td = dataByTerminal.get(terminal);
+        return td != null ? td.images : List.of();
+    }
+
+    /** 获取指定终端的雷达槽位 */
+    public static List<RadarRenderData> getRadarSlotsFor(BlockPos terminal) {
+        TerminalData td = dataByTerminal.get(terminal);
+        return td != null ? td.radarSlots : List.of();
+    }
+
+    // ---- 雷达全局数据（来自雷达 Monitor，非终端级） ----
+    private static List<com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.RadarTrackEntry> radarTracks = new ArrayList<>();
+    private static float radarSweepAngle = 0f;
+    private static float radarGlobalRange = 50f;
+    private static double radarX, radarY, radarZ;
+
+    public static void updateRadarTracks(
+            List<com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.RadarTrackEntry> tracks,
+            float sweepAngle, float range, double rX, double rY, double rZ) {
+        radarTracks = tracks;
+        radarSweepAngle = sweepAngle;
+        radarGlobalRange = range;
+        radarX = rX;
+        radarY = rY;
+        radarZ = rZ;
+    }
+
+    public static float getRadarSweepAngle() { return radarSweepAngle; }
+    public static float getRadarGlobalRange() { return radarGlobalRange; }
+    public static double getRadarX() { return radarX; }
+    public static double getRadarY() { return radarY; }
+    public static double getRadarZ() { return radarZ; }
+    public static List<com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.RadarTrackEntry> getRadarTracks() { return radarTracks; }
+
+    // ---- 兼容旧 API（无终端参数时返回第一个终端数据） ----
     public static List<SlotRenderData> getSlots() {
-        return slots;
+        return dataByTerminal.values().stream().findFirst()
+                .map(td -> td.slots).orElse(List.of());
     }
-
     public static List<StaticTextRenderData> getStaticTextSlots() {
-        return staticTexts;
+        return dataByTerminal.values().stream().findFirst()
+                .map(td -> td.staticTexts).orElse(List.of());
     }
-
     public static List<ImageRenderData> getImages() {
-        return images;
+        return dataByTerminal.values().stream().findFirst()
+                .map(td -> td.images).orElse(List.of());
+    }
+    public static List<RadarRenderData> getRadarSlots() {
+        return dataByTerminal.values().stream().findFirst()
+                .map(td -> td.radarSlots).orElse(List.of());
     }
 
-    // 数据源槽位渲染数据
+    // ========== 渲染数据类 ==========
+
     public static class SlotRenderData {
         public final BlockPos sourcePos;
         public final int posX, posY;
@@ -147,7 +125,6 @@ public class ClientHudData {
         }
     }
 
-    // 静态文本槽位渲染数据
     public static class StaticTextRenderData {
         public final String text;
         public final int posX, posY;
@@ -167,7 +144,6 @@ public class ClientHudData {
         }
     }
 
-    // 图片槽位渲染数据
     public static class ImageRenderData {
         public final UUID imageId;
         public final byte[] imageData;
@@ -189,38 +165,6 @@ public class ClientHudData {
         }
     }
 
-    // ========== 雷达数据 ==========
-
-    /** 更新雷达轨迹+扫描角度+雷达坐标 */
-    public static void updateRadarTracks(
-            List<com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.RadarTrackEntry> tracks,
-            float sweepAngle, float range, double rX, double rY, double rZ) {
-        radarTracks = tracks;
-        radarSweepAngle = sweepAngle;
-        radarGlobalRange = range;
-        radarX = rX;
-        radarY = rY;
-        radarZ = rZ;
-    }
-
-    public static float getRadarSweepAngle() { return radarSweepAngle; }
-    public static float getRadarGlobalRange() { return radarGlobalRange; }
-    public static double getRadarX() { return radarX; }
-    public static double getRadarY() { return radarY; }
-    public static double getRadarZ() { return radarZ; }
-
-    /** 更新雷达槽位配置（由 OpenOmniCoreScreenPayload 触发） */
-    public static void updateRadarSlots(List<RadarRenderData> slots) {
-        radarSlots = slots;
-    }
-
-    public static List<RadarRenderData> getRadarSlots() { return radarSlots; }
-
-    public static List<com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.RadarTrackEntry> getRadarTracks() {
-        return radarTracks;
-    }
-
-    /** 雷达槽位渲染数据 */
     public static class RadarRenderData {
         public final int posX, posY;
         public final float scale;
@@ -235,6 +179,63 @@ public class ClientHudData {
             this.rotation = rotation;
             this.alpha = alpha;
             this.radarRange = range;
+        }
+    }
+
+    // ========== 内部数据容器 ==========
+
+    private static class TerminalData {
+        List<SlotRenderData> slots = new ArrayList<>();
+        List<StaticTextRenderData> staticTexts = new ArrayList<>();
+        List<ImageRenderData> images = new ArrayList<>();
+        List<RadarRenderData> radarSlots = new ArrayList<>();
+
+        void update(CompoundTag data) {
+            slots.clear();
+            staticTexts.clear();
+            images.clear();
+            radarSlots.clear();
+
+            if (data.contains("slotCount")) {
+                int count = data.getInt("slotCount");
+                for (int i = 0; i < count; i++) {
+                    CompoundTag tag = data.getCompound("slot_" + i);
+                    BlockPos sp = BlockPos.of(tag.getLong("sourcePos"));
+                    slots.add(new SlotRenderData(sp, tag.getInt("posX"), tag.getInt("posY"),
+                            tag.getFloat("scale"), tag.getString("text"), tag.getInt("displayLine"),
+                            tag.getFloat("rotation"), tag.getInt("color"), tag.getInt("alpha")));
+                }
+            }
+            if (data.contains("staticCount")) {
+                int count = data.getInt("staticCount");
+                for (int i = 0; i < count; i++) {
+                    CompoundTag tag = data.getCompound("static_" + i);
+                    staticTexts.add(new StaticTextRenderData(tag.getString("text"),
+                            tag.getInt("posX"), tag.getInt("posY"), tag.getFloat("scale"),
+                            tag.getFloat("rotation"), tag.getInt("color"), tag.getInt("alpha")));
+                }
+            }
+            if (data.contains("imageCount")) {
+                int count = data.getInt("imageCount");
+                for (int i = 0; i < count; i++) {
+                    CompoundTag tag = data.getCompound("image_" + i);
+                    UUID id = tag.getUUID("ImageId");
+                    byte[] bytes = tag.getByteArray("ImageData");
+                    images.add(new ImageRenderData(id, bytes, tag.getString("FileName"),
+                            tag.getInt("PosX"), tag.getInt("PosY"), tag.getFloat("Scale"),
+                            tag.getFloat("Rotation"), tag.getInt("Alpha")));
+                    DynamicTextureCache.getOrCreate(id, bytes);
+                }
+            }
+            if (data.contains("radarCount")) {
+                int count = data.getInt("radarCount");
+                for (int i = 0; i < count; i++) {
+                    CompoundTag tag = data.getCompound("radar_" + i);
+                    radarSlots.add(new RadarRenderData(tag.getInt("PosX"), tag.getInt("PosY"),
+                            tag.getFloat("Scale"), tag.getFloat("Rotation"),
+                            tag.getInt("Alpha"), tag.getInt("RadarRange")));
+                }
+            }
         }
     }
 }

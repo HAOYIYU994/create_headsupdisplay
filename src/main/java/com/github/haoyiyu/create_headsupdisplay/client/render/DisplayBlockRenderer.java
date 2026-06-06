@@ -56,8 +56,8 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
         BlockPos termPos = ctrl.getBoundTerminal();
         if (termPos == null) return;
 
-        var slots = ClientHudData.getSlots();
-        var staticTexts = ClientHudData.getStaticTextSlots();
+        var slots = ClientHudData.getSlotsFor(termPos);
+        var staticTexts = ClientHudData.getStaticTextsFor(termPos);
 
         Font font = Minecraft.getInstance().font;
 
@@ -91,8 +91,20 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
 
         int renderedCount = 0;
 
+        // --- 渲染雷达图（底层） ---
+        var radarSlots = ClientHudData.getRadarSlotsFor(termPos);
+        var radarTracks = ClientHudData.getRadarTracks();
+        if (radarSlots != null && !radarSlots.isEmpty()) {
+            for (var slot : radarSlots) {
+                float dx = slot.posX * scaleX;
+                float dy = slot.posY * scaleY;
+                if (inRegion(dx + 16, dy + 16, regionLeft - 32, regionRight + 32, regionTop - 32, regionBottom + 32))
+                    renderRadarOnPanel(pose, font, buffer, slot, radarTracks, dx, dy, light);
+            }
+        }
+
         // --- 渲染图片（底层，Tessellator） ---
-        var images = ClientHudData.getImages();
+        var images = ClientHudData.getImagesFor(termPos);
         if (images != null && !images.isEmpty()) {
             for (var img : images) {
                 float dx = img.posX * scaleX;
@@ -144,6 +156,155 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
         }
 
         pose.popPose();
+    }
+
+    private static final ResourceLocation TEX_FILLER    = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/radar_bg_filler.png");
+    private static final ResourceLocation TEX_CIRCLE    = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/radar_bg_circle.png");
+    private static final ResourceLocation TEX_SWEEP     = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/radar_sweep.png");
+    private static final ResourceLocation TEX_PLAYER    = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/player.png");
+    private static final ResourceLocation TEX_ENTITY    = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/entity_hitbox.png");
+    private static final ResourceLocation TEX_CONTRAPTION = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/contraption_hitbox.png");
+    private static final ResourceLocation TEX_PROJECTILE = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/projectile.png");
+    private static final int RADAR_SIZE = 24; // 面板上的雷达显示尺寸
+
+    private void renderRadarOnPanel(PoseStack pose, Font font, MultiBufferSource buffer,
+                                     ClientHudData.RadarRenderData slot,
+                                     java.util.List<com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.RadarTrackEntry> tracks,
+                                     float dx, float dy, int light) {
+        float baseRange = ClientHudData.getRadarGlobalRange();
+        float range = baseRange > 0 ? baseRange : (slot.radarRange > 0 ? slot.radarRange : 50f);
+        double rX = ClientHudData.getRadarX();
+        double rZ = ClientHudData.getRadarZ();
+        float globalAngle = ClientHudData.getRadarSweepAngle();
+        float playerYaw = Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getYRot() : 0f;
+
+        float s = Math.max(0.1f, slot.scale);
+        float size = RADAR_SIZE * s;
+        float half = size / 2f;
+        float cx = dx + half;
+        float cy = dy + half;
+
+        pose.pushPose();
+
+        // 圆形黑底
+        RenderSystem.setShaderTexture(0, TEX_FILLER);
+        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+        RenderSystem.enableBlend();
+        RenderSystem.setShaderColor(0f, 0f, 0f, 0.6f * slot.alpha / 255f);
+        drawTexturedQuad(pose, dx, dy, size, size);
+
+        // 圆形绿边框
+        RenderSystem.setShaderTexture(0, TEX_CIRCLE);
+        RenderSystem.setShaderColor(0f, 1f, 0f, 0.3f * slot.alpha / 255f);
+        drawTexturedQuad(pose, dx, dy, size, size);
+
+        // 扫描线
+        float sweepAngle = (playerYaw + globalAngle) % 360f;
+        if (sweepAngle < 0) sweepAngle += 360;
+        double sweepRad = Math.toRadians(sweepAngle);
+        float sweepX = cx + half * (float)Math.sin(sweepRad);
+        float sweepY = cy - half * (float)Math.cos(sweepRad);
+        RenderSystem.setShaderTexture(0, TEX_SWEEP);
+        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+        RenderSystem.setShaderColor(0f, 0.8f, 0f, 0.3f * slot.alpha / 255f);
+        pose.pushPose();
+        pose.translate(cx, cy, 0.005f);
+        pose.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-sweepAngle));
+        pose.translate(-cx, -cy, 0);
+        drawTexturedQuad(pose, dx, dy, size, size);
+        pose.popPose();
+
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+
+        // 目标标记
+        if (tracks != null && !tracks.isEmpty()) {
+            float trackSize = Math.max(2f, 4f * s);
+            for (var track : tracks) {
+                double relX = -(track.x() - rX);
+                double relZ = track.z() - rZ;
+                double dist = Math.sqrt(relX * relX + relZ * relZ);
+                if (dist > range) continue;
+
+                float xOff = (float)(relX / range) / 2f * 0.75f;
+                float zOff = (float)(relZ / range) / 2f * 0.75f;
+                if (Math.abs(xOff) > 0.5f || Math.abs(zOff) > 0.5f) continue;
+
+                double rad = Math.toRadians(playerYaw);
+                float rx = (float)(xOff * Math.cos(rad) - zOff * Math.sin(rad));
+                float rz = (float)(xOff * Math.sin(rad) + zOff * Math.cos(rad));
+
+                float tx = cx + rx * size;
+                float ty = cy - rz * size;
+
+                int col = getRadarTrackColor(track.categoryOrdinal());
+                float tr = ((col >> 16) & 0xFF) / 255f;
+                float tg = ((col >> 8) & 0xFF) / 255f;
+                float tb = (col & 0xFF) / 255f;
+
+                ResourceLocation tTex = switch (track.categoryOrdinal()) {
+                    case 0 -> TEX_PLAYER;
+                    case 5 -> TEX_CONTRAPTION;
+                    case 4 -> TEX_PROJECTILE;
+                    default -> TEX_ENTITY;
+                };
+
+                RenderSystem.setShaderTexture(0, tTex);
+                RenderSystem.setShader(GameRenderer::getPositionTexShader);
+                RenderSystem.setShaderColor(tr, tg, tb, slot.alpha / 255f);
+                drawTexturedQuad(pose, tx - trackSize/2, ty - trackSize/2, trackSize, trackSize);
+
+                // 玩家名
+                if (track.categoryOrdinal() == 0 && !track.id().isEmpty()) {
+                    String name = resolveRadarPlayerName(track.id());
+                    if (name.length() > 8) name = name.substring(0, 8);
+                    float labelY = ty + trackSize;
+                    pose.pushPose();
+                    pose.translate(tx, labelY, 0.01f);
+                    pose.scale(0.4f * s, 0.4f * s, 1f);
+                    font.drawInBatch(name, -font.width(name)/2f, 0, 0xFFFFFFFF,
+                            false, pose.last().pose(), buffer, Font.DisplayMode.NORMAL, 0, light);
+                    pose.popPose();
+                }
+            }
+            RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        }
+
+        RenderSystem.disableBlend();
+        pose.popPose();
+    }
+
+    private void drawTexturedQuad(PoseStack pose, float x, float y, float w, float h) {
+        Matrix4f mat = pose.last().pose();
+        var tesselator = Tesselator.getInstance();
+        var builder = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+        builder.addVertex(mat, x, y + h, 0).setUv(0, 1);
+        builder.addVertex(mat, x + w, y + h, 0).setUv(1, 1);
+        builder.addVertex(mat, x + w, y, 0).setUv(1, 0);
+        builder.addVertex(mat, x, y, 0).setUv(0, 0);
+        var meshData = builder.build();
+        if (meshData != null) BufferUploader.drawWithShader(meshData);
+    }
+
+    private static int getRadarTrackColor(int cat) {
+        return switch (cat) {
+            case 0 -> 0x00FF00;
+            case 1, 3 -> 0xFFFF00;
+            case 2 -> 0xFF0000;
+            case 4 -> 0xFF8800;
+            case 5 -> 0x4488FF;
+            case 6 -> 0xCCCCCC;
+            default -> 0x888888;
+        };
+    }
+
+    private String resolveRadarPlayerName(String trackId) {
+        var mc = Minecraft.getInstance();
+        if (mc.level == null) return trackId;
+        for (var p : mc.level.players()) {
+            if (p.getStringUUID().equals(trackId) || p.getName().getString().equals(trackId))
+                return p.getName().getString();
+        }
+        return trackId.length() > 12 ? trackId.substring(0, 12) : trackId;
     }
 
     /** 用 Tessellator 在面板上渲染图片纹理（POSITION_COLOR_TEX，无需 UV1/UV2/Normal） */

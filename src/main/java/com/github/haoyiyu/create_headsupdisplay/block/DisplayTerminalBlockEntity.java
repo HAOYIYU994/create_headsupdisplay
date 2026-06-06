@@ -178,6 +178,7 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
         }
 
         CompoundTag full = new CompoundTag();
+        full.putLong("TerminalPos", worldPosition.asLong());
         full.putInt("slotCount", slotsData.size());
         for (int i = 0; i < slotsData.size(); i++) {
             full.put("slot_" + i, slotsData.get(i));
@@ -209,7 +210,6 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
     // ========== 打开配置屏幕（发送所有数据） ==========
     public void openConfigurationScreen(Player player) {
         if (level != null && !level.isClientSide && player instanceof ServerPlayer serverPlayer) {
-            syncToBoundPlayers(); // 先同步当前数据
             sendOpenConfigScreen(serverPlayer);
         }
     }

@@ -31,8 +31,8 @@ public record PushRadarSlotsPayload(BlockPos corePos) implements CustomPacketPay
                 }
                 core.pushRadarSlotsToTerminal();
                 ctx.player().displayClientMessage(
-                        net.minecraft.network.chat.Component.literal("§aRadar slots pushed to terminal."),
-                        false);
+                        net.minecraft.network.chat.Component.translatable("message.create_headsupdisplay.source_sent"),
+                        true);
             }
         });
     }

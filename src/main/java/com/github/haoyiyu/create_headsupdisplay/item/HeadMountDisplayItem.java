@@ -43,17 +43,18 @@ public class HeadMountDisplayItem extends Item implements Equipable {
     public InteractionResult useOn(UseOnContext context) {
         Level level = context.getLevel();
         BlockPos pos = context.getClickedPos();
+        var player = context.getPlayer();
+        if (player == null || !player.isShiftKeyDown()) return super.useOn(context);
+
         BlockEntity be = level.getBlockEntity(pos);
         if (be != null && be.getBlockState().getBlock() instanceof DisplayTerminalBlock) {
             if (!level.isClientSide) {
                 ItemStack stack = context.getItemInHand();
                 bindTerminal(stack, pos);
-                if (context.getPlayer() != null) {
-                    context.getPlayer().displayClientMessage(
-                            net.minecraft.network.chat.Component.literal("Glasses bound to terminal at " + pos.toShortString()),
-                            true
-                    );
-                }
+                player.displayClientMessage(
+                        net.minecraft.network.chat.Component.literal("Glasses bound to terminal at " + pos.toShortString()),
+                        true
+                );
             }
             return InteractionResult.SUCCESS;
         }
