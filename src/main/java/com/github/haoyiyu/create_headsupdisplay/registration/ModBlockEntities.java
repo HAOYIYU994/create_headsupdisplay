@@ -1,6 +1,7 @@
 package com.github.haoyiyu.create_headsupdisplay.registration;
 
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
+import com.github.haoyiyu.create_headsupdisplay.block.DisplayBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.block.LinkBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.block.OmniCoreBlockEntity;
@@ -27,6 +28,10 @@ public class ModBlockEntities {
     public static final Supplier<BlockEntityType<LinkBlockEntity>> LINK =
             BLOCK_ENTITIES.register("link", () -> BlockEntityType.Builder.of(LinkBlockEntity::new,
                     ModBlocks.LINK_BLOCK.get()).build(null));
+
+    public static final Supplier<BlockEntityType<DisplayBlockEntity>> DISPLAY =
+            BLOCK_ENTITIES.register("display", () -> BlockEntityType.Builder.of(DisplayBlockEntity::new,
+                    ModBlocks.DISPLAY.get()).build(null));
 
     public static void register(net.neoforged.bus.api.IEventBus bus) {
         BLOCK_ENTITIES.register(bus);

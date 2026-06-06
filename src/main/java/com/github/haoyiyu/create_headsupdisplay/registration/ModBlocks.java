@@ -1,6 +1,7 @@
 package com.github.haoyiyu.create_headsupdisplay.registration;
 
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
+import com.github.haoyiyu.create_headsupdisplay.block.DisplayBlock;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlock;
 import com.github.haoyiyu.create_headsupdisplay.block.LinkBlock;
 import com.github.haoyiyu.create_headsupdisplay.block.OmniCoreBlock;
@@ -23,6 +24,10 @@ public class ModBlocks {
     // 链接方块：连接 OmniCore 和 Display Terminal
     public static final DeferredBlock<LinkBlock> LINK_BLOCK = BLOCKS.registerBlock("link_block",
             LinkBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).noOcclusion());
+
+    public static final DeferredBlock<DisplayBlock> DISPLAY = BLOCKS.registerBlock("display",
+            DisplayBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).noOcclusion()
+                    .lightLevel(s -> 8));
 
     public static void register(net.neoforged.bus.api.IEventBus bus) {
         BLOCKS.register(bus);

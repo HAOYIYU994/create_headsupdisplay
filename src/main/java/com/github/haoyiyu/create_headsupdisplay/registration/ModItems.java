@@ -25,6 +25,9 @@ public class ModItems {
     public static final DeferredItem<LinkBlockItem> LINK_BLOCK_ITEM = ITEMS.register("link_block",
             () -> new LinkBlockItem(new Item.Properties().stacksTo(64)));
 
+    public static final DeferredItem<BlockItem> DISPLAY_ITEM = ITEMS.register("display",
+            () -> new BlockItem(ModBlocks.DISPLAY.get(), new Item.Properties()));
+
     public static void register(net.neoforged.bus.api.IEventBus bus) {
         ITEMS.register(bus);
     }

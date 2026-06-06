@@ -5,6 +5,7 @@
   "block.create_headsupdisplay.display_terminal": "Display Terminal",
   "block.create_headsupdisplay.omni_core": "Omni Core",
   "block.create_headsupdisplay.link_block": "Link Block",
+  "block.create_headsupdisplay.display": "Display",
 
   "message.create_headsupdisplay.bound": "Glasses bound to terminal",
   "message.create_headsupdisplay.bind_mode": "Right-click a Display Terminal to bind",

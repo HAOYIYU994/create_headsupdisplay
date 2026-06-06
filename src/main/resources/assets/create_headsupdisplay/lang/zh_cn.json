@@ -5,6 +5,7 @@
   "block.create_headsupdisplay.display_terminal": "显示终端",
   "block.create_headsupdisplay.omni_core": "万物互联核心",
   "block.create_headsupdisplay.link_block": "链接方块",
+  "block.create_headsupdisplay.display": "显示器",
 
   "message.create_headsupdisplay.bound": "护目镜已绑定到终端",
   "message.create_headsupdisplay.bind_mode": "右键点击显示终端以绑定",
