@@ -370,7 +370,7 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
     // ========== 图片槽位管理 ==========
     public List<ImageSlot> getImageSlots() { return new ArrayList<>(imageSlots.values()); }
     public void addImageSlot(UUID imageId, String fileName, byte[] imageData) {
-        if (imageData == null || imageData.length > 512 * 1024) return;
+        if (imageData == null || imageData.length > com.github.haoyiyu.create_headsupdisplay.config.ModConfig.IMAGE_MAX_SIZE_KB.get() * 1024) return;
         ImageSlot slot = new ImageSlot(imageId, fileName, imageData);
         imageSlots.put(imageId, slot);
         setChanged();
@@ -378,7 +378,7 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
 
     /** 只更新图片数据，保留位置/旋转/透明度等配置 */
     public void updateImageData(UUID imageId, String fileName, byte[] imageData) {
-        if (imageData == null || imageData.length > 512 * 1024) return;
+        if (imageData == null || imageData.length > com.github.haoyiyu.create_headsupdisplay.config.ModConfig.IMAGE_MAX_SIZE_KB.get() * 1024) return;
         ImageSlot existing = imageSlots.get(imageId);
         if (existing != null) {
             existing.setFileName(fileName);

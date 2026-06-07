@@ -42,7 +42,8 @@ public record UploadImageCompletePayload(BlockPos corePos, UUID imageId) impleme
                 var be = sp.level().getBlockEntity(payload.corePos);
                 if (be instanceof OmniCoreBlockEntity core) {
                     core.addImageSource(payload.imageId, fileName, assembled);
-                    // 刷新 GUI
+                    CreateHeadsUpDisplay.LOGGER.info("[ImageUpload] Player {} uploaded image '{}' ({} bytes)",
+                            sp.getName().getString(), fileName, assembled.length);
                     core.openConfigScreen(sp);
                 }
             }

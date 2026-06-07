@@ -126,6 +126,12 @@ public class OmniCoreScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+
+        // 右上角帮助按钮
+        addRenderableWidget(Button.builder(Component.literal("?"), b -> {
+            Minecraft.getInstance().setScreen(new HelpScreen(this));
+        }).bounds(width - 22, 4, 18, 16).build());
+
         int y = 10;
         addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.add_source"), b -> {
             PacketDistributor.sendToServer(new RequestOpenFrequencySelectionPayload(corePos));
@@ -555,7 +561,7 @@ public class OmniCoreScreen extends Screen {
             try {
                 Path path = getImageFolder().resolve(fileName);
                 byte[] raw = Files.readAllBytes(path);
-                if (raw.length > 512 * 1024) return; // 原始文件也限制 512KB
+                if (raw.length > com.github.haoyiyu.create_headsupdisplay.config.ModConfig.IMAGE_MAX_SIZE_KB.get() * 1024) return;
                 String lo = fileName.toLowerCase();
 
                 byte[] pngBytes;

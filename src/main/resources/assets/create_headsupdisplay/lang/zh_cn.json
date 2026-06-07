@@ -65,11 +65,28 @@
   "gui.create_headsupdisplay.display_terminal.confirm": "确认",
 
   "tooltip.create_headsupdisplay.hold_shift": "按住 %s 以获取更多信息",
+  "tooltip.create_headsupdisplay.image_plugin.line1": "§8» §7允许数据集成核心处理图片",
+  "tooltip.create_headsupdisplay.image_plugin.line2": "§8» §7在核心点击\"添加图片\"以添加图片到核心",
+  "tooltip.create_headsupdisplay.image_plugin.line3": "§8» §7上传的图片将会上传到服务端",
+  "tooltip.create_headsupdisplay.radar_plugin.line1": "§8» §7允许数据集成核心连接雷达",
+  "tooltip.create_headsupdisplay.radar_plugin.line2": "§8» §7在核心点击\"扫描雷达\"以连接核心附近的雷达",
   "tooltip.create_headsupdisplay.head_mount_display.line1": "§8» §7允许你查看已绑定显示终端的信息",
   "tooltip.create_headsupdisplay.head_mount_display.line2": "§8» §7shift+右键点击显示终端以绑定",
   "tooltip.create_headsupdisplay.head_mount_display.line3": "§8» §7支持可定制的HUD布局",
 
   "hud.create_headsupdisplay.progress": "%d%%",
+
+  "gui.create_headsupdisplay.help.title": "数据集成核心 - 使用说明",
+  "gui.create_headsupdisplay.help.line1": "1. 用链接方块连接核心和显示终端（右键核心→右键终端）",
+  "gui.create_headsupdisplay.help.line2": "2. 添加红石信号源：点击\"添加信号源\"放入频率物品",
+  "gui.create_headsupdisplay.help.line3": "3. 选中信号源，点击\"发送\"推送到终端",
+  "gui.create_headsupdisplay.help.line4": "4. 安装插件解锁对应功能",
+  "gui.create_headsupdisplay.help.line5": "5. 插件槽：点\"插件\"按钮打开插件槽",
+  "gui.create_headsupdisplay.help.line6": "6. 终端列表：左下角选择发送目标终端",
+  "gui.create_headsupdisplay.help.line7": "7. 双击终端名可重命名",
+  "gui.create_headsupdisplay.help.line8": "8. 丢弃插件终端对应数据将会全部丢失，请谨慎",
+  "gui.create_headsupdisplay.help.line9": "9. Shift+头盔右键终端=绑定头盔",
+  "gui.create_headsupdisplay.help.line10": "10. Scan Radar：扫描附近雷达并连接",
 
   "gui.create_headsupdisplay.scan_radar": "扫描雷达",
   "gui.create_headsupdisplay.plugins": "插件",

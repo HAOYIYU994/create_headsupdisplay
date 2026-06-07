@@ -65,11 +65,28 @@
   "gui.create_headsupdisplay.display_terminal.confirm": "Confirm",
 
   "tooltip.create_headsupdisplay.hold_shift": "Hold %s for more information",
+  "tooltip.create_headsupdisplay.image_plugin.line1": "§8» §7Allows the Data Integration Core to process images",
+  "tooltip.create_headsupdisplay.image_plugin.line2": "§8» §7Click 'Add Image' in the Core to upload images",
+  "tooltip.create_headsupdisplay.image_plugin.line3": "§8» §7Uploaded images will be sent to the server",
+  "tooltip.create_headsupdisplay.radar_plugin.line1": "§8» §7Allows the Data Integration Core to connect to radars",
+  "tooltip.create_headsupdisplay.radar_plugin.line2": "§8» §7Click 'Scan Radar' in the Core to connect nearby radars",
   "tooltip.create_headsupdisplay.head_mount_display.line1": "§8» §7Allows you to view information from a linked Display Terminal",
   "tooltip.create_headsupdisplay.head_mount_display.line2": "§8» §7Right-click+shift on a Display Terminal to link",
   "tooltip.create_headsupdisplay.head_mount_display.line3": "§8» §7Supports customizable HUD layouts",
 
   "hud.create_headsupdisplay.progress": "%d%%",
+
+  "gui.create_headsupdisplay.help.title": "Data Integration Core - Help",
+  "gui.create_headsupdisplay.help.line1": "1. Use Link Block to connect Core to Display Terminal (right-click Core -> right-click Terminal)",
+  "gui.create_headsupdisplay.help.line2": "2. Add redstone source: click 'Add Source' and place frequency items",
+  "gui.create_headsupdisplay.help.line3": "3. Select a source and click 'Send' to push to terminal",
+  "gui.create_headsupdisplay.help.line4": "4. Install plugins to unlock features",
+  "gui.create_headsupdisplay.help.line5": "5. Plugin slots: click 'Plugins' to open plugin slots",
+  "gui.create_headsupdisplay.help.line6": "6. Terminal list: bottom-left, select target terminal",
+  "gui.create_headsupdisplay.help.line7": "7. Double-click terminal to rename",
+  "gui.create_headsupdisplay.help.line8": "8. Removing plugins will DELETE terminal data, use with caution",
+  "gui.create_headsupdisplay.help.line9": "9. Shift+right-click terminal with helmet = bind",
+  "gui.create_headsupdisplay.help.line10": "10. Scan Radar: scan nearby radar monitors",
 
   "gui.create_headsupdisplay.scan_radar": "Scan Radar",
   "gui.create_headsupdisplay.plugins": "Plugins",

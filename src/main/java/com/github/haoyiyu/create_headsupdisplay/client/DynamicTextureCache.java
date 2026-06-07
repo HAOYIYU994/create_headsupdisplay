@@ -21,7 +21,7 @@ import java.util.UUID;
 public class DynamicTextureCache {
     private static final Map<UUID, ResourceLocation> CACHE = new HashMap<>();
     private static final Map<UUID, int[]> SIZE_CACHE = new HashMap<>(); // [width, height]
-    private static final int MAX_PNG_BYTES = 512 * 1024; // 512KB
+    private static int maxBytes() { return com.github.haoyiyu.create_headsupdisplay.config.ModConfig.IMAGE_MAX_SIZE_KB.get() * 1024; }
 
     /**
      * 获取或创建纹理（普通图片，缓存后不更新）。
@@ -30,7 +30,7 @@ public class DynamicTextureCache {
         if (CACHE.containsKey(imageId)) {
             return CACHE.get(imageId);
         }
-        if (pngBytes == null || pngBytes.length > MAX_PNG_BYTES) return null;
+        if (pngBytes == null || pngBytes.length > maxBytes()) return null;
         try {
             ByteArrayInputStream in = new ByteArrayInputStream(pngBytes);
             NativeImage nativeImage = NativeImage.read(in);
@@ -47,7 +47,7 @@ public class DynamicTextureCache {
 
     /** 更新纹理数据（用于雷达图等实时刷新的图片） */
     public static ResourceLocation getOrUpdate(UUID imageId, byte[] pngBytes) {
-        if (pngBytes == null || pngBytes.length > MAX_PNG_BYTES) return CACHE.get(imageId);
+        if (pngBytes == null || pngBytes.length > maxBytes()) return CACHE.get(imageId);
         try {
             ByteArrayInputStream in = new ByteArrayInputStream(pngBytes);
             NativeImage nativeImage = NativeImage.read(in);

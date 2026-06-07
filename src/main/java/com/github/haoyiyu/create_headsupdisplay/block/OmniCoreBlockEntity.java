@@ -246,7 +246,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
 
     /** 添加一个 IMAGE 类型的图片源 */
     public void addImageSource(UUID imageId, String fileName, byte[] imageData) {
-        if (imageData == null || imageData.length > 512 * 1024) return;
+        if (imageData == null || imageData.length > com.github.haoyiyu.create_headsupdisplay.config.ModConfig.IMAGE_MAX_SIZE_KB.get() * 1024) return;
         if (imageData.length < 8) return;
         sources.add(RedstoneSource.image(imageId, fileName, imageData));
         setChanged();

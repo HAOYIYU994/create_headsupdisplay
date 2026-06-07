@@ -3,6 +3,8 @@ package com.github.haoyiyu.create_headsupdisplay;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalTarget;
 import com.github.haoyiyu.create_headsupdisplay.block.OmniCoreDisplayTarget;
 import com.github.haoyiyu.create_headsupdisplay.client.HeadMountDisplayClient;
+import com.github.haoyiyu.create_headsupdisplay.config.ModConfig;
+import net.neoforged.fml.ModContainer;
 import com.github.haoyiyu.create_headsupdisplay.menu.DisplayTerminalScreen;
 import com.github.haoyiyu.create_headsupdisplay.screen.FrequencySelectionScreen;
 import com.github.haoyiyu.create_headsupdisplay.screen.PluginSlotScreen;
@@ -35,7 +37,8 @@ public class CreateHeadsUpDisplay {
     public static final String MOD_ID = "create_headsupdisplay";
     public static final Logger LOGGER = LogUtils.getLogger();
 
-    public CreateHeadsUpDisplay(IEventBus modBus) {
+    public CreateHeadsUpDisplay(IEventBus modBus, ModContainer container) {
+        ModConfig.register(container);
         ModBlocks.register(modBus);
         ModBlockEntities.register(modBus);
         ModItems.register(modBus);
@@ -71,22 +74,34 @@ public class CreateHeadsUpDisplay {
 
     private void onItemTooltip(ItemTooltipEvent event) {
         ItemStack stack = event.getItemStack();
-        // 只处理我们自己的头盔物品
-        if (!stack.is(ModItems.HEAD_MOUNT_DISPLAY.get())) return;
-
-        // 直接使用 Screen.hasShiftDown() 检测 Shift 键（不依赖玩家实体）
         boolean isShiftHeld = net.minecraft.client.gui.screens.Screen.hasShiftDown();
 
-        // 可选：日志输出便于调试（运行后查看控制台）
-        CreateHeadsUpDisplay.LOGGER.info("Shift held (Screen.hasShiftDown): " + isShiftHeld);
-
-        if (isShiftHeld) {
-            event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.head_mount_display.line1"));
-            event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.head_mount_display.line2"));
-            event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.head_mount_display.line3"));
-        } else {
-            event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.hold_shift",
-                    Component.keybind("key.sneak")));
+        if (stack.is(ModItems.HEAD_MOUNT_DISPLAY.get())) {
+            if (isShiftHeld) {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.head_mount_display.line1"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.head_mount_display.line2"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.head_mount_display.line3"));
+            } else {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.hold_shift",
+                        Component.keybind("key.sneak")));
+            }
+        } else if (stack.is(ModItems.IMAGE_PLUGIN.get())) {
+            if (isShiftHeld) {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.image_plugin.line1"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.image_plugin.line2"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.image_plugin.line3"));
+            } else {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.hold_shift",
+                        Component.keybind("key.sneak")));
+            }
+        } else if (stack.is(ModItems.RADAR_PLUGIN.get())) {
+            if (isShiftHeld) {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.radar_plugin.line1"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.radar_plugin.line2"));
+            } else {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.hold_shift",
+                        Component.keybind("key.sneak")));
+            }
         }
     }
 
