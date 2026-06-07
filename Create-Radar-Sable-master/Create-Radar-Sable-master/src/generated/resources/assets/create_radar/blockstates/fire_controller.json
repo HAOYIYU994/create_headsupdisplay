@@ -1,6 +1,0 @@
-{
-  "variants": {
-    "powered=false": { "model": "create_radar:block/fire_controller" },
-    "powered=true":  { "model": "create_radar:block/fire_controller_on" }
-  }
-}
