@@ -25,8 +25,8 @@ public record PushRadarSlotsPayload(BlockPos corePos, int terminalIndex) impleme
             if (ctx.player().level().getBlockEntity(payload.corePos) instanceof OmniCoreBlockEntity core) {
                 if (core.getBoundTerminal() == null) {
                     ctx.player().displayClientMessage(
-                            net.minecraft.network.chat.Component.literal("§cNo Display Terminal bound! Use LinkBlock to connect OmniCore -> Terminal first."),
-                            false);
+                            net.minecraft.network.chat.Component.translatable("message.create_headsupdisplay.no_terminal_bound"),
+                            true);
                     return;
                 }
                 core.pushRadarSlotsToTerminal(payload.terminalIndex);

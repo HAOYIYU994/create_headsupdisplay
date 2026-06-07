@@ -254,15 +254,13 @@ public class OmniCoreScreen extends Screen {
                 int purpleRight = icon2X + iconSize + 1;
                 graphics.fill(purpleLeft, iconY - 1, purpleRight, iconY + iconSize + 1, 0xAAFF00FF);
                 int centerIconX = (purpleLeft + purpleRight) / 2 - 8;
-                graphics.renderItem(new ItemStack(net.minecraft.world.item.Items.PAINTING), centerIconX, iconY);
+                graphics.renderItem(new ItemStack(com.github.haoyiyu.create_headsupdisplay.registration.ModItems.IMAGE_PLUGIN.get()), centerIconX, iconY);
             } else if (src.isRadar) {
                 int greenLeft = icon1X - 1;
                 int greenRight = icon2X + iconSize + 1;
                 graphics.fill(greenLeft, iconY - 1, greenRight, iconY + iconSize + 1, 0xAA00FF00);
                 int centerIconX = (greenLeft + greenRight) / 2 - 8;
-                var radarItem = net.minecraft.core.registries.BuiltInRegistries.ITEM.get(
-                    net.minecraft.resources.ResourceLocation.fromNamespaceAndPath("create_radar", "radar_safe_zone_designator"));
-                graphics.renderItem(new ItemStack(radarItem != null ? radarItem : net.minecraft.world.item.Items.COMPASS), centerIconX, iconY);
+                graphics.renderItem(new ItemStack(com.github.haoyiyu.create_headsupdisplay.registration.ModItems.RADAR_PLUGIN.get()), centerIconX, iconY);
             } else if (src.dlText != null) {
                 int yellowLeft = icon1X - 1;
                 int yellowRight = icon2X + iconSize + 1;
@@ -536,6 +534,14 @@ public class OmniCoreScreen extends Screen {
             refreshFileList();
             fileScrollOffset = 0;
 
+            // 打开图片文件夹
+            addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.open_folder"), b -> {
+                Path dir = getImageFolder();
+                try {
+                    net.minecraft.Util.getPlatform().openFile(dir.toFile());
+                } catch (Exception ignored) {}
+            }).bounds(80, height - 30, 70, 20).build());
+
             // 底部返回按钮
             addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.back"), b -> {
                 if (uploading) return;
@@ -628,7 +634,8 @@ public class OmniCoreScreen extends Screen {
             super.render(graphics, mouseX, mouseY, partialTick);
 
             // 标题 + 刷新按钮
-            graphics.drawCenteredString(font, "Upload Image", width / 2, 10, 0xFFFFFF);
+            graphics.drawCenteredString(font, Component.translatable("gui.create_headsupdisplay.upload_image.title").getString(), width / 2, 10, 0xFFFFFF);
+            graphics.drawString(font, Component.translatable("gui.create_headsupdisplay.upload_image.format_hint").getString(), width / 4, 10, 0x888888);
 
             // ===== 左侧文件列表 =====
             int listLeft = 10;
@@ -638,14 +645,14 @@ public class OmniCoreScreen extends Screen {
 
             // 背景
             graphics.fill(listLeft, listTop, listLeft + listWidth, listBottom, 0xCC222222);
-            graphics.drawString(font, "Images (" + pngFiles.size() + ")", listLeft + 4, listTop + 2, 0xAAAAAA);
+            graphics.drawString(font, Component.translatable("gui.create_headsupdisplay.upload_image.images_count", pngFiles.size()).getString(), listLeft + 4, listTop + 2, 0xAAAAAA);
 
             // 刷新按钮
             int refreshX = listLeft + listWidth - 42;
             int refreshY = listTop + 1;
             boolean refreshHovered = mouseX >= refreshX && mouseX <= refreshX + 40 && mouseY >= refreshY && mouseY <= refreshY + 14;
             graphics.fill(refreshX, refreshY, refreshX + 40, refreshY + 14, refreshHovered ? 0xFF556688 : 0xFF334455);
-            graphics.drawString(font, "Refresh", refreshX + 2, refreshY + 3, 0xCCCCCC);
+            graphics.drawString(font, Component.translatable("gui.create_headsupdisplay.upload_image.refresh").getString(), refreshX + 2, refreshY + 3, 0xCCCCCC);
 
             graphics.fill(listLeft, listTop + 16, listLeft + listWidth, listTop + 17, 0xFF555555);
 
@@ -704,7 +711,7 @@ public class OmniCoreScreen extends Screen {
                 graphics.drawCenteredString(font, loadedFileName,
                         previewLeft + previewW / 2, nameY, 0xAAAAAA);
             } else {
-                graphics.drawCenteredString(font, "Select an image from the left",
+                graphics.drawCenteredString(font, Component.translatable("gui.create_headsupdisplay.upload_image.select_hint").getString(),
                         previewLeft + previewW / 2, previewTop + previewH / 2 - 10, 0x888888);
             }
 
@@ -716,11 +723,11 @@ public class OmniCoreScreen extends Screen {
                 boolean canUpload = loadedBytes != null;
                 graphics.fill(uploadBtnX, uploadBtnY, uploadBtnX + uploadBtnW, uploadBtnY + 30,
                         canUpload ? 0xFF008800 : 0xFF444444);
-                graphics.drawCenteredString(font, "Upload",
+                graphics.drawCenteredString(font, Component.translatable("gui.create_headsupdisplay.upload_image.upload_btn").getString(),
                         uploadBtnX + uploadBtnW / 2, uploadBtnY + 10, 0xFFFFFF);
             } else {
                 graphics.fill(uploadBtnX, uploadBtnY, uploadBtnX + uploadBtnW, uploadBtnY + 30, 0xFFCC0000);
-                graphics.drawCenteredString(font, "Stop",
+                graphics.drawCenteredString(font, Component.translatable("gui.create_headsupdisplay.upload_image.stop_btn").getString(),
                         uploadBtnX + uploadBtnW / 2, uploadBtnY + 10, 0xFFFFFF);
             }
 

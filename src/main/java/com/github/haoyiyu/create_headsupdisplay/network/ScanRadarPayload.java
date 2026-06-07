@@ -44,12 +44,12 @@ public record ScanRadarPayload(BlockPos corePos) implements CustomPacketPayload 
             if (found != null) {
                 core.setLinkedMonitor(found);
                 context.player().displayClientMessage(
-                        net.minecraft.network.chat.Component.literal("§aRadar Monitor found and linked at " + found.toShortString()),
-                        false);
+                        net.minecraft.network.chat.Component.translatable("message.create_headsupdisplay.scan_radar_found", found.toShortString()),
+                        true);
             } else {
                 context.player().displayClientMessage(
-                        net.minecraft.network.chat.Component.literal("§cNo radar Monitor found within " + range + " blocks"),
-                        false);
+                        net.minecraft.network.chat.Component.translatable("message.create_headsupdisplay.scan_radar_not_found", range),
+                        true);
             }
         });
     }

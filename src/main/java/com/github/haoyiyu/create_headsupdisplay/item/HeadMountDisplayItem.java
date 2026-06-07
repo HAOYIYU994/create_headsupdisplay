@@ -52,7 +52,7 @@ public class HeadMountDisplayItem extends Item implements Equipable {
                 ItemStack stack = context.getItemInHand();
                 bindTerminal(stack, pos);
                 player.displayClientMessage(
-                        net.minecraft.network.chat.Component.literal("Glasses bound to terminal at " + pos.toShortString()),
+                        net.minecraft.network.chat.Component.translatable("message.create_headsupdisplay.bound", pos.toShortString()),
                         true
                 );
             }

@@ -35,7 +35,6 @@ public class TerminalConfigScreen extends Screen {
 
     private EditBox addTextInput;
     private Button addTextButton;
-    private Button resetLayoutButton;
 
     public TerminalConfigScreen(CompoundTag data) {
         super(Component.translatable("gui.create_headsupdisplay.display_terminal.title"));
@@ -103,11 +102,6 @@ public class TerminalConfigScreen extends Screen {
     protected void init() {
         super.init();
 
-        resetLayoutButton = Button.builder(Component.translatable("gui.create_headsupdisplay.display_terminal.reset_layout"), b -> resetLayout())
-                .bounds(width / 2 + 20, height - 30, 60, 20)
-                .build();
-        addRenderableWidget(resetLayoutButton);
-
         addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.display_terminal.save"), b -> saveChanges())
                 .bounds(width / 2 - 40, height - 30, 80, 20)
                 .build());
@@ -120,37 +114,6 @@ public class TerminalConfigScreen extends Screen {
                 .bounds(width / 2 + 60, height - 60, 60, 20)
                 .build();
         addRenderableWidget(addTextButton);
-    }
-
-    private void resetLayout() {
-        int startX = width / 2 - 150;
-        int startY = height / 2 - 60;
-        int col = 0, row = 0;
-        int spacingX = 260;
-        int spacingY = 40;
-
-        for (SlotEntry slot : slots) {
-            slot.posX = startX + col * spacingX;
-            slot.posY = startY + row * spacingY;
-            slot.posX = Math.min(Math.max(slot.posX, 0), width - getSlotWidth(slot));
-            slot.posY = Math.min(Math.max(slot.posY, 0), height - (int)(20 * slot.scale));
-            col++;
-            if (col >= 2) {
-                col = 0;
-                row++;
-            }
-        }
-        for (StaticTextEntry entry : staticTexts) {
-            entry.posX = startX + col * spacingX;
-            entry.posY = startY + row * spacingY;
-            entry.posX = Math.min(Math.max(entry.posX, 0), width - getStaticWidth(entry));
-            entry.posY = Math.min(Math.max(entry.posY, 0), height - (int)(20 * entry.scale));
-            col++;
-            if (col >= 2) {
-                col = 0;
-                row++;
-            }
-        }
     }
 
     private void addStaticText() {
