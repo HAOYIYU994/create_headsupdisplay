@@ -245,5 +245,12 @@ public class NetworkHandler {
                 UpdateRadarSlotPayload::handle
         );
 
+        // 终端命名（客户端 -> 服务端）
+        registrar.playToServer(
+                SetTerminalNamePayload.TYPE,
+                SetTerminalNamePayload.CODEC,
+                SetTerminalNamePayload::handle
+        );
+
     }
 }

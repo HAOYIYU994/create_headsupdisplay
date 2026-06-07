@@ -78,4 +78,15 @@ public class LinkBlock extends BaseEntityBlock {
     public BlockEntity newBlockEntity(BlockPos pos, BlockState state) {
         return ModBlockEntities.LINK.get().create(pos, state);
     }
+
+    @Override
+    protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moved) {
+        if (!state.is(newState.getBlock())) {
+            BlockEntity be = level.getBlockEntity(pos);
+            if (be instanceof LinkBlockEntity link) {
+                link.onBroken();
+            }
+        }
+        super.onRemove(state, level, pos, newState, moved);
+    }
 }

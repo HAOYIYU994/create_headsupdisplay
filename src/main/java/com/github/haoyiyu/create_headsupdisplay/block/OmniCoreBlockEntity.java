@@ -4,7 +4,6 @@ import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
 import com.github.haoyiyu.create_headsupdisplay.config.DisplaySlot;
 import com.github.haoyiyu.create_headsupdisplay.config.RadarSlot;
 import com.github.haoyiyu.create_headsupdisplay.config.TranslationConfig;
-import com.github.haoyiyu.create_headsupdisplay.integration.RadarIntegration;
 import com.github.haoyiyu.create_headsupdisplay.network.OpenOmniCoreScreenPayload;
 import com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload;
 import com.github.haoyiyu.create_headsupdisplay.registration.ModBlockEntities;
@@ -31,7 +30,8 @@ import java.util.UUID;
 
 public class OmniCoreBlockEntity extends BlockEntity {
     private boolean autoSortEnabled = true; // 自动置顶开关
-    private List<BlockPos> boundTerminals = new ArrayList<>(); // 支持绑定多个终端
+    private List<BlockPos> boundTerminals = new ArrayList<>();
+    private Map<BlockPos, String> terminalNames = new HashMap<>(); // 终端名称
     private List<RedstoneSource> sources = new ArrayList<>();
     private Map<Integer, BlockPos> sentSources = new HashMap<>();
 
@@ -59,6 +59,27 @@ public class OmniCoreBlockEntity extends BlockEntity {
 
     public List<BlockPos> getBoundTerminals() { return boundTerminals; }
 
+    public void removeBoundTerminal(BlockPos pos) {
+        boundTerminals.remove(pos);
+        terminalNames.remove(pos);
+        setChanged();
+    }
+
+    public String getTerminalName(BlockPos pos) {
+        return terminalNames.getOrDefault(pos, "");
+    }
+
+    public void setTerminalName(BlockPos pos, String name) {
+        if (name == null || name.isEmpty()) terminalNames.remove(pos);
+        else terminalNames.put(pos, name);
+        setChanged();
+    }
+
+    public void clearLinkedMonitor() {
+        linkedMonitorPos = null;
+        setChanged();
+    }
+
     /** 连接雷达 Monitor，自动创建默认雷达槽位并同步到终端 */
     public void setLinkedMonitor(BlockPos pos) {
         this.linkedMonitorPos = pos;
@@ -74,15 +95,25 @@ public class OmniCoreBlockEntity extends BlockEntity {
         CreateHeadsUpDisplay.LOGGER.info("OMNI linkedMonitor SET to {}", pos);
     }
 
-    /** 将雷达槽位配置推送到所有绑定的终端 */
-    public void pushRadarSlotsToTerminal() {
+    /** 将雷达槽位配置推送到指定终端（-1 = 所有） */
+    public void pushRadarSlotsToTerminal(int terminalIndex) {
         if (level == null) return;
-        for (BlockPos tp : boundTerminals) {
+        var targets = new ArrayList<BlockPos>();
+        if (terminalIndex < 0) {
+            targets.addAll(boundTerminals);
+        } else if (terminalIndex < boundTerminals.size()) {
+            targets.add(boundTerminals.get(terminalIndex));
+        }
+        for (BlockPos tp : targets) {
             BlockEntity be = level.getBlockEntity(tp);
             if (be instanceof DisplayTerminalBlockEntity terminal) {
                 terminal.setRadarSlots(new ArrayList<>(radarSlots));
             }
         }
+    }
+
+    public void pushRadarSlotsToTerminal() {
+        pushRadarSlotsToTerminal(-1);
     }
 
     public BlockPos getLinkedMonitor() { return linkedMonitorPos; }
@@ -99,6 +130,8 @@ public class OmniCoreBlockEntity extends BlockEntity {
             for (BlockPos tp : boundTerminals) {
                 CompoundTag tt = new CompoundTag();
                 tt.putLong("Pos", tp.asLong());
+                String name = terminalNames.get(tp);
+                if (name != null && !name.isEmpty()) tt.putString("Name", name);
                 terminalsTag.add(tt);
             }
             data.put("BoundTerminalsList", terminalsTag);
@@ -216,6 +249,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
     public void removeRadarSlot(int index) {
         if (index >= 0 && index < radarSlots.size()) {
             radarSlots.remove(index);
+            pushRadarSlotsToTerminal(-1); // 同步删除到所有终端
             setChanged();
         }
     }
@@ -238,62 +272,79 @@ public class OmniCoreBlockEntity extends BlockEntity {
     private void syncRadarTracks() {
         if (level == null || level.isClientSide || linkedMonitorPos == null) return;
         BlockEntity be = level.getBlockEntity(linkedMonitorPos);
+        if (be == null) { linkedMonitorPos = null; setChanged(); return; }
         var beClass = be.getClass().getName();
         if (!beClass.equals("com.happysg.radar.block.monitor.MonitorBlockEntity")
             && !beClass.equals("com.happysg.radar.block.radar.bearing.RadarBearingBlockEntity"))
             return;
 
         try {
-            var getControllerMethod = be.getClass().getMethod("getController");
-            Object controller = getControllerMethod.invoke(be);
+            boolean isBearing = beClass.contains("RadarBearing");
 
-            var tracksField = controller.getClass().getDeclaredField("cachedTracks");
-            tracksField.setAccessible(true);
-            @SuppressWarnings("unchecked")
-            var tracks = (java.util.Collection<?>) tracksField.get(controller);
-
-            java.util.List<SyncRadarDataPayload.RadarTrackEntry> entries = new java.util.ArrayList<>();
-            for (Object track : tracks) {
-                try {
-                    var posMethod = track.getClass().getMethod("position");
-                    var catMethod = track.getClass().getMethod("trackCategory");
-                    var idMethod = track.getClass().getMethod("id");
-                    var velMethod = track.getClass().getMethod("velocity");
-                    Object pos = posMethod.invoke(track);
-                    Object vel = velMethod.invoke(track);
-                    Object cat = catMethod.invoke(track);
-                    String id = (String) idMethod.invoke(track);
-                    double x = (double) pos.getClass().getMethod("x").invoke(pos);
-                    double y = (double) pos.getClass().getMethod("y").invoke(pos);
-                    double z = (double) pos.getClass().getMethod("z").invoke(pos);
-                    double vx = (double) vel.getClass().getMethod("x").invoke(vel);
-                    double vy = (double) vel.getClass().getMethod("y").invoke(vel);
-                    double vz = (double) vel.getClass().getMethod("z").invoke(vel);
-                    int catOrd = ((Enum<?>) cat).ordinal();
-                    entries.add(new SyncRadarDataPayload.RadarTrackEntry(
-                            id, x, y, z, vx, vy, vz, catOrd,
-                            track.getClass().getMethod("entityType").invoke(track).toString()));
-                } catch (Exception ignored) {}
+            // 获取 tracks
+            java.util.Collection<?> tracks;
+            if (isBearing) {
+                tracks = (java.util.Collection<?>) be.getClass().getMethod("getTracks").invoke(be);
+            } else {
+                Object controller = be.getClass().getMethod("getController").invoke(be);
+                var tracksField = controller.getClass().getDeclaredField("cachedTracks");
+                tracksField.setAccessible(true);
+                tracks = (java.util.Collection<?>) tracksField.get(controller);
             }
 
-            // 获取雷达扫描角度和范围+位置
+            java.util.List<SyncRadarDataPayload.RadarTrackEntry> entries = new java.util.ArrayList<>();
+            if (tracks != null) {
+                for (Object track : tracks) {
+                    try {
+                        var posMethod = track.getClass().getMethod("position");
+                        var catMethod = track.getClass().getMethod("trackCategory");
+                        var idMethod = track.getClass().getMethod("id");
+                        var velMethod = track.getClass().getMethod("velocity");
+                        Object pos = posMethod.invoke(track);
+                        Object vel = velMethod.invoke(track);
+                        Object cat = catMethod.invoke(track);
+                        String id = (String) idMethod.invoke(track);
+                        double x = (double) pos.getClass().getMethod("x").invoke(pos);
+                        double y = (double) pos.getClass().getMethod("y").invoke(pos);
+                        double z = (double) pos.getClass().getMethod("z").invoke(pos);
+                        double vx = (double) vel.getClass().getMethod("x").invoke(vel);
+                        double vy = (double) vel.getClass().getMethod("y").invoke(vel);
+                        double vz = (double) vel.getClass().getMethod("z").invoke(vel);
+                        int catOrd = ((Enum<?>) cat).ordinal();
+                        entries.add(new SyncRadarDataPayload.RadarTrackEntry(
+                                id, x, y, z, vx, vy, vz, catOrd,
+                                track.getClass().getMethod("entityType").invoke(track).toString()));
+                    } catch (Exception ignored) {}
+                }
+            }
+
+            // 获取雷达角度、范围、位置
             float sweepAngle = 0f;
             float radarRange = 50f;
             double rX = 0, rY = 0, rZ = 0;
             try {
-                var getRadarMethod = controller.getClass().getMethod("getRadar");
-                var radarOpt = getRadarMethod.invoke(controller);
-                if (radarOpt instanceof java.util.Optional<?> opt && opt.isPresent()) {
-                    Object radar = opt.get();
-                    sweepAngle = (float) radar.getClass().getMethod("getGlobalAngle").invoke(radar);
-                    radarRange = (float) radar.getClass().getMethod("getRange").invoke(radar);
-                }
-                var getCenterMethod = controller.getClass().getMethod("getRadarCenterPos");
-                Object center = getCenterMethod.invoke(controller);
-                if (center != null) {
-                    rX = (double) center.getClass().getMethod("x").invoke(center);
-                    rY = (double) center.getClass().getMethod("y").invoke(center);
-                    rZ = (double) center.getClass().getMethod("z").invoke(center);
+                if (isBearing) {
+                    sweepAngle = (float) be.getClass().getMethod("getGlobalAngle").invoke(be);
+                    radarRange = (float) be.getClass().getMethod("getRange").invoke(be);
+                    Object worldPos = be.getClass().getMethod("getWorldPos").invoke(be);
+                    rX = (double) worldPos.getClass().getMethod("getX").invoke(worldPos);
+                    rY = (double) worldPos.getClass().getMethod("getY").invoke(worldPos);
+                    rZ = (double) worldPos.getClass().getMethod("getZ").invoke(worldPos);
+                } else {
+                    Object controller = be.getClass().getMethod("getController").invoke(be);
+                    var getRadarMethod = controller.getClass().getMethod("getRadar");
+                    var radarOpt = getRadarMethod.invoke(controller);
+                    if (radarOpt instanceof java.util.Optional<?> opt && opt.isPresent()) {
+                        Object radar = opt.get();
+                        sweepAngle = (float) radar.getClass().getMethod("getGlobalAngle").invoke(radar);
+                        radarRange = (float) radar.getClass().getMethod("getRange").invoke(radar);
+                    }
+                    Object center = controller.getClass().getMethod("getRadarCenterPos").invoke(controller);
+                    if (center != null) {
+                        rX = (double) center.getClass().getMethod("x").invoke(center);
+                        rY = (double) center.getClass().getMethod("y").invoke(center);
+                        rZ = (double) center.getClass().getMethod("z").invoke(center);
+                    }
                 }
             } catch (Exception ignored) {}
 
@@ -549,6 +600,8 @@ public class OmniCoreBlockEntity extends BlockEntity {
         for (BlockPos bp : boundTerminals) {
             CompoundTag bt = new CompoundTag();
             bt.putLong("Pos", bp.asLong());
+            String name = terminalNames.get(bp);
+            if (name != null && !name.isEmpty()) bt.putString("Name", name);
             boundTag.add(bt);
         }
         tag.put("BoundTerminals", boundTag);
@@ -607,10 +660,14 @@ public class OmniCoreBlockEntity extends BlockEntity {
             // 兼容旧格式
             boundTerminals.add(BlockPos.of(tag.getLong("BoundTerminal")));
         }
+        terminalNames.clear();
         if (tag.contains("BoundTerminals")) {
             ListTag boundTag = tag.getList("BoundTerminals", Tag.TAG_COMPOUND);
             for (int i = 0; i < boundTag.size(); i++) {
-                boundTerminals.add(BlockPos.of(boundTag.getCompound(i).getLong("Pos")));
+                CompoundTag bt = boundTag.getCompound(i);
+                BlockPos bp = BlockPos.of(bt.getLong("Pos"));
+                boundTerminals.add(bp);
+                if (bt.contains("Name")) terminalNames.put(bp, bt.getString("Name"));
             }
         }
         sources.clear();

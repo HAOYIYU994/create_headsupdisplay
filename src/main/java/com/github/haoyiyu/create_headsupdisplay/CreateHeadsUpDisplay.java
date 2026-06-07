@@ -3,13 +3,15 @@ package com.github.haoyiyu.create_headsupdisplay;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalTarget;
 import com.github.haoyiyu.create_headsupdisplay.block.OmniCoreDisplayTarget;
 import com.github.haoyiyu.create_headsupdisplay.client.HeadMountDisplayClient;
-import com.github.haoyiyu.create_headsupdisplay.integration.RadarIntegration;
 import com.github.haoyiyu.create_headsupdisplay.menu.DisplayTerminalScreen;
 import com.github.haoyiyu.create_headsupdisplay.screen.FrequencySelectionScreen;
 import com.github.haoyiyu.create_headsupdisplay.registration.*;
 import com.simibubi.create.api.behaviour.display.DisplayTarget;
+import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlockEntity;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.api.distmarker.Dist;
@@ -23,6 +25,7 @@ import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
@@ -45,14 +48,19 @@ public class CreateHeadsUpDisplay {
 
         // 注册 Tooltip 事件监听（使用 NeoForge 事件总线）
         NeoForge.EVENT_BUS.addListener(this::onItemTooltip);
+        // 玩家登录时立即同步终端数据
+        NeoForge.EVENT_BUS.addListener(this::onPlayerLogin);
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
             DisplayTarget.BY_BLOCK.register(ModBlocks.DISPLAY_TERMINAL.get(), new DisplayTerminalTarget());
             DisplayTarget.BY_BLOCK.register(ModBlocks.OMNI_CORE.get(), new OmniCoreDisplayTarget());
-            // 雷达集成（软依赖，无雷达时安全跳过）
-            RadarIntegration.init();
+            // 雷达集成（软依赖，通过反射安全调用）
+            try {
+                Class<?> radarIntegration = Class.forName("com.github.haoyiyu.create_headsupdisplay.integration.RadarIntegration");
+                radarIntegration.getMethod("init").invoke(null);
+            } catch (Exception ignored) {}
         });
     }
 
@@ -78,6 +86,21 @@ public class CreateHeadsUpDisplay {
         } else {
             event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.hold_shift",
                     Component.keybind("key.sneak")));
+        }
+    }
+
+    /** 玩家登录时立即同步附近终端数据到头盔和显示器 */
+    private void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
+        if (!(event.getEntity() instanceof ServerPlayer sp)) return;
+        var level = sp.serverLevel();
+        BlockPos playerPos = sp.blockPosition();
+        int range = 128;
+        for (BlockPos p : BlockPos.betweenClosed(
+                playerPos.offset(-range, -range, -range),
+                playerPos.offset(range, range, range))) {
+            if (level.getBlockEntity(p) instanceof DisplayTerminalBlockEntity terminal) {
+                terminal.syncToBoundPlayers();
+            }
         }
     }
 

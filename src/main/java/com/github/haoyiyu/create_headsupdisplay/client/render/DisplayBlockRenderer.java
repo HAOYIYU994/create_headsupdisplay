@@ -92,6 +92,8 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
         int renderedCount = 0;
 
         // --- 渲染雷达图（底层） ---
+        RenderSystem.enableDepthTest();
+        RenderSystem.depthMask(true);
         var radarSlots = ClientHudData.getRadarSlotsFor(termPos);
         var radarTracks = ClientHudData.getRadarTracks();
         if (radarSlots != null && !radarSlots.isEmpty()) {
@@ -99,11 +101,11 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
                 float dx = slot.posX * scaleX;
                 float dy = slot.posY * scaleY;
                 if (inRegion(dx + 16, dy + 16, regionLeft - 32, regionRight + 32, regionTop - 32, regionBottom + 32))
-                    renderRadarOnPanel(pose, font, buffer, slot, radarTracks, dx, dy, light);
+                    renderRadarOnPanel(pose, font, buffer, slot, radarTracks, dx, dy, light, facing);
             }
         }
 
-        // --- 渲染图片（底层，Tessellator） ---
+        // --- 渲染图片（底层） ---
         var images = ClientHudData.getImagesFor(termPos);
         if (images != null && !images.isEmpty()) {
             for (var img : images) {
@@ -123,7 +125,9 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
             }
         }
 
-        // 初始化字体 buffer consumer
+        // 关闭深度测试，开始字体渲染
+        RenderSystem.disableDepthTest();
+        RenderSystem.depthMask(false);
         font.drawInBatch(" ", 0, 0, 0x00000000, false, pose.last().pose(), buffer, Font.DisplayMode.NORMAL, 0, light);
 
         // --- 渲染动态槽位（顶层） ---
@@ -170,13 +174,14 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
     private void renderRadarOnPanel(PoseStack pose, Font font, MultiBufferSource buffer,
                                      ClientHudData.RadarRenderData slot,
                                      java.util.List<com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.RadarTrackEntry> tracks,
-                                     float dx, float dy, int light) {
+                                     float dx, float dy, int light, Direction facing) {
         float baseRange = ClientHudData.getRadarGlobalRange();
         float range = baseRange > 0 ? baseRange : (slot.radarRange > 0 ? slot.radarRange : 50f);
         double rX = ClientHudData.getRadarX();
         double rZ = ClientHudData.getRadarZ();
         float globalAngle = ClientHudData.getRadarSweepAngle();
-        float playerYaw = Minecraft.getInstance().player != null ? Minecraft.getInstance().player.getYRot() : 0f;
+        // 雷达方向跟随显示器方块朝向
+        float faceAngle = AngleHelper.horizontalAngle(facing) + 180f;
 
         float s = Math.max(0.1f, slot.scale);
         float size = RADAR_SIZE * s;
@@ -199,7 +204,7 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
         drawTexturedQuad(pose, dx, dy, size, size);
 
         // 扫描线
-        float sweepAngle = (playerYaw + globalAngle) % 360f;
+        float sweepAngle = (globalAngle - faceAngle) % 360f;
         if (sweepAngle < 0) sweepAngle += 360;
         double sweepRad = Math.toRadians(sweepAngle);
         float sweepX = cx + half * (float)Math.sin(sweepRad);
@@ -229,7 +234,8 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
                 float zOff = (float)(relZ / range) / 2f * 0.75f;
                 if (Math.abs(xOff) > 0.5f || Math.abs(zOff) > 0.5f) continue;
 
-                double rad = Math.toRadians(playerYaw);
+                // 按方块朝向旋转
+                double rad = Math.toRadians(-faceAngle);
                 float rx = (float)(xOff * Math.cos(rad) - zOff * Math.sin(rad));
                 float rz = (float)(xOff * Math.sin(rad) + zOff * Math.cos(rad));
 
@@ -257,10 +263,10 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
                 if (track.categoryOrdinal() == 0 && !track.id().isEmpty()) {
                     String name = resolveRadarPlayerName(track.id());
                     if (name.length() > 8) name = name.substring(0, 8);
-                    float labelY = ty + trackSize;
+                    float labelY = ty + trackSize - size / 5f;
                     pose.pushPose();
                     pose.translate(tx, labelY, 0.01f);
-                    pose.scale(0.4f * s, 0.4f * s, 1f);
+                    pose.scale(0.1f, 0.1f, 1f);
                     font.drawInBatch(name, -font.width(name)/2f, 0, 0xFFFFFFFF,
                             false, pose.last().pose(), buffer, Font.DisplayMode.NORMAL, 0, light);
                     pose.popPose();

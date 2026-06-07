@@ -109,12 +109,7 @@ public class LinkBlockItem extends BlockItem {
     /** 软检测是否为雷达 Monitor 或 RadarBearing（轴承） */
     private static boolean isRadarMonitor(BlockEntity be) {
         if (be == null) return false;
-        try {
-            be.getClass().getMethod("getController");
-            String name = be.getClass().getName();
-            return name.contains("Monitor") || name.contains("RadarBearing");
-        } catch (Exception e) {
-            return false;
-        }
+        String name = be.getClass().getName();
+        return name.contains("MonitorBlockEntity") || name.contains("RadarBearingBlockEntity");
     }
 }

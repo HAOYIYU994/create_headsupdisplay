@@ -40,6 +40,16 @@ public class LinkBlockEntity extends BlockEntity {
     public BlockPos getTerminalPos() { return terminalPos; }
     public BlockPos getMonitorPos() { return monitorPos; }
 
+    /** 被拆除时调用，断开 OmniCore 与终端的连接 */
+    public void onBroken() {
+        if (level == null || level.isClientSide || omniCorePos == null) return;
+        BlockEntity be = level.getBlockEntity(omniCorePos);
+        if (be instanceof OmniCoreBlockEntity core) {
+            if (terminalPos != null) core.removeBoundTerminal(terminalPos);
+            if (monitorPos != null) core.clearLinkedMonitor();
+        }
+    }
+
     /** 被放置到世界后调用，通知 OmniCore 绑定终端或监听雷达 */
     public void onPlaced() {
         if (level == null || level.isClientSide) return;

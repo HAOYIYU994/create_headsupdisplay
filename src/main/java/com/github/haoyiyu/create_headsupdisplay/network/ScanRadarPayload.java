@@ -55,12 +55,8 @@ public record ScanRadarPayload(BlockPos corePos) implements CustomPacketPayload 
     }
 
     private static boolean isMonitor(BlockEntity be) {
-        try {
-            be.getClass().getMethod("getController");
-            String name = be.getClass().getName();
-            return name.contains("Monitor") || name.contains("RadarBearing");
-        } catch (Exception e) {
-            return false;
-        }
+        if (be == null) return false;
+        String name = be.getClass().getName();
+        return name.contains("MonitorBlockEntity") || name.contains("RadarBearingBlockEntity");
     }
 }

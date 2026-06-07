@@ -34,13 +34,15 @@ import java.util.UUID;
 public class OmniCoreScreen extends Screen {
     private final BlockPos corePos;
     private final List<SourceEntry> sources = new ArrayList<>();
-    private final List<BlockPos> boundTerminalList = new ArrayList<>();
+    private final List<TerminalEntry> terminalEntries = new ArrayList<>();
     private int selectedTerminal = -1; // -1 = 所有终端
     private int scrollOffset = 0;
     private static final int ENTRY_HEIGHT = 25;
     private int tickCounter = 0;
     private long lastDataHash = 0;
     private boolean autoSort = true;
+    private boolean renameMode = false;
+    private String renameInput = "";
 
     public OmniCoreScreen(CompoundTag data) {
         super(Component.translatable("gui.create_headsupdisplay.omni_core.title"));
@@ -48,7 +50,10 @@ public class OmniCoreScreen extends Screen {
         if (data.contains("BoundTerminalsList")) {
             ListTag terminalsTag = data.getList("BoundTerminalsList", Tag.TAG_COMPOUND);
             for (int i = 0; i < terminalsTag.size(); i++) {
-                boundTerminalList.add(BlockPos.of(terminalsTag.getCompound(i).getLong("Pos")));
+                CompoundTag tt = terminalsTag.getCompound(i);
+                BlockPos pos = BlockPos.of(tt.getLong("Pos"));
+                String name = tt.contains("Name") ? tt.getString("Name") : "";
+                terminalEntries.add(new TerminalEntry(pos, name, i));
             }
         }
         loadSourcesFromTag(data);
@@ -135,9 +140,6 @@ public class OmniCoreScreen extends Screen {
             autoSort = !autoSort;
             b.setMessage(Component.translatable(autoSort ? "gui.create_headsupdisplay.sort_on" : "gui.create_headsupdisplay.sort_off"));
         }).bounds(10, 82, 100, 20).build());
-
-        addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.back"), b -> onClose())
-                .bounds(10, height - 30, 60, 20).build());
     }
 
     @Override
@@ -177,23 +179,39 @@ public class OmniCoreScreen extends Screen {
         renderBackground(graphics, mouseX, mouseY, partialTick);
         super.render(graphics, mouseX, mouseY, partialTick);
 
-        // ===== 右上角：终端选择器 =====
-        if (!boundTerminalList.isEmpty()) {
-            int selectorX = width - 170;
-            int selectorY = 4;
-            String label;
-            if (selectedTerminal < 0) {
-                label = "→ All Terminals";
-            } else {
-                BlockPos tp = boundTerminalList.get(selectedTerminal);
-                label = "→ " + tp.toShortString();
+        // ===== 左下角：终端列表（宽度与按钮一致 100px） =====
+        int termW = 100;
+        int termListX = 10;
+        int termListY = height - 30 - terminalEntries.size() * 16;
+        if (!terminalEntries.isEmpty()) {
+            graphics.fill(termListX - 2, termListY - 16, termListX + termW + 2, height, 0xCC222222);
+            graphics.drawString(font, "Terminals:", termListX, termListY - 14, 0xAAAAAA);
+            for (int i = 0; i < terminalEntries.size(); i++) {
+                var te = terminalEntries.get(i);
+                int ty = termListY + i * 16;
+                boolean sel = selectedTerminal == te.index;
+                boolean hover = mouseX >= termListX && mouseX <= termListX + termW && mouseY >= ty && mouseY <= ty + 14;
+                int bg = sel ? 0xFF006600 : (hover ? 0xFF444444 : 0xFF222222);
+                graphics.fill(termListX, ty, termListX + termW, ty + 14, bg);
+                String label = te.name.isEmpty() ? te.pos.toShortString() : te.name;
+                graphics.drawString(font, label, termListX + 2, ty + 3, sel ? 0x00FF00 : 0xCCCCCC);
             }
-            graphics.fill(selectorX, selectorY, selectorX + 160, selectorY + 16, 0xCC333333);
-            graphics.drawString(font, label, selectorX + 4, selectorY + 4, 0x00FF00);
-            // 点击区域记录
-            if (mouseX >= selectorX && mouseX <= selectorX + 160 && mouseY >= selectorY && mouseY <= selectorY + 16) {
-                graphics.fill(selectorX, selectorY, selectorX + 160, selectorY + 1, 0xFF00FF00);
-            }
+            int allY = termListY + terminalEntries.size() * 16 + 2;
+            boolean allSel = selectedTerminal < 0;
+            graphics.fill(termListX, allY, termListX + termW, allY + 14, allSel ? 0xFF006600 : 0xFF333333);
+            graphics.drawString(font, "→ All", termListX + 2, allY + 3, allSel ? 0x00FF00 : 0xAAAAAA);
+        }
+
+        // ===== 终端重命名 =====
+        if (renameMode && selectedTerminal >= 0 && selectedTerminal < terminalEntries.size()) {
+            var te = terminalEntries.get(selectedTerminal);
+            int rnX = termListX;
+            int rnY = termListY - 44;
+            graphics.fill(rnX - 2, rnY - 2, rnX + termW + 2, rnY + 30, 0xCC333333);
+            graphics.drawString(font, "Rename:", rnX, rnY, 0xFFFFFF);
+            graphics.drawString(font, "[" + renameInput + "_]", rnX, rnY + 14, 0x00FF00);
+            graphics.fill(rnX, rnY + 26, rnX + 50, rnY + 30, 0xFF006600);
+            graphics.drawString(font, "OK", rnX + 16, rnY + 26, 0xFFFFFF);
         }
 
         int startX = 160;
@@ -299,13 +317,43 @@ public class OmniCoreScreen extends Screen {
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (super.mouseClicked(mouseX, mouseY, button)) return true;
 
-        // 终端选择器点击：循环切换
-        if (!boundTerminalList.isEmpty()) {
-            int selectorX = width - 170;
-            int selectorY = 4;
-            if (mouseX >= selectorX && mouseX <= selectorX + 160 && mouseY >= selectorY && mouseY <= selectorY + 16) {
-                selectedTerminal++;
-                if (selectedTerminal >= boundTerminalList.size()) selectedTerminal = -1;
+        // 重命名 OK 按钮
+        if (renameMode) {
+            int rnX = 10, rnY = height - 30 - terminalEntries.size() * 16 - 44;
+            if (mouseX >= rnX && mouseX <= rnX + 50 && mouseY >= rnY + 26 && mouseY <= rnY + 30) {
+                renameMode = false;
+                if (selectedTerminal >= 0 && selectedTerminal < terminalEntries.size()) {
+                    var te = terminalEntries.get(selectedTerminal);
+                    te.name = renameInput;
+                    PacketDistributor.sendToServer(new SetTerminalNamePayload(corePos, te.index, renameInput));
+                }
+                renameInput = "";
+                return true;
+            }
+            renameMode = false;
+            renameInput = "";
+        }
+
+        // 左下角终端列表点击
+        if (!terminalEntries.isEmpty()) {
+            int termW = 100, termListX = 10;
+            int termListY = height - 30 - terminalEntries.size() * 16;
+            for (int i = 0; i < terminalEntries.size(); i++) {
+                int ty = termListY + i * 16;
+                if (mouseX >= termListX && mouseX <= termListX + termW && mouseY >= ty && mouseY <= ty + 14) {
+                    var te = terminalEntries.get(i);
+                    if (selectedTerminal == te.index) {
+                        renameMode = true;
+                        renameInput = te.name;
+                    } else {
+                        selectedTerminal = te.index;
+                    }
+                    return true;
+                }
+            }
+            int allY = termListY + terminalEntries.size() * 16 + 2;
+            if (mouseX >= termListX && mouseX <= termListX + termW && mouseY >= allY && mouseY <= allY + 14) {
+                selectedTerminal = -1;
                 return true;
             }
         }
@@ -334,7 +382,7 @@ public class OmniCoreScreen extends Screen {
             }
             if (mouseX >= width - 80 && mouseX <= width - 50 && mouseY >= y && mouseY <= y + 20) {
                 if (sources.get(i).isRadar) {
-                    PacketDistributor.sendToServer(new PushRadarSlotsPayload(corePos));
+                    PacketDistributor.sendToServer(new PushRadarSlotsPayload(corePos, selectedTerminal));
                 } else {
                     PacketDistributor.sendToServer(new SendSourceToTerminalPayload(corePos, i, selectedTerminal));
                 }
@@ -368,6 +416,36 @@ public class OmniCoreScreen extends Screen {
             scrollOffset = (int) Math.clamp(scrollOffset - scrollY * 10, 0, maxScroll);
         }
         return true;
+    }
+
+    @Override
+    public boolean charTyped(char codePoint, int modifiers) {
+        if (renameMode) {
+            if (codePoint >= 32 && renameInput.length() < 16) {
+                renameInput += codePoint;
+            }
+            return true;
+        }
+        return super.charTyped(codePoint, modifiers);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (renameMode) {
+            if (keyCode == 259 && !renameInput.isEmpty()) { // Backspace
+                renameInput = renameInput.substring(0, renameInput.length() - 1);
+            } else if (keyCode == 257) { // Enter
+                renameMode = false;
+                if (selectedTerminal >= 0 && selectedTerminal < terminalEntries.size()) {
+                    var te = terminalEntries.get(selectedTerminal);
+                    te.name = renameInput;
+                    PacketDistributor.sendToServer(new SetTerminalNamePayload(corePos, te.index, renameInput));
+                }
+                renameInput = "";
+            }
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
@@ -760,6 +838,17 @@ public class OmniCoreScreen extends Screen {
                     RenderSystem.disableBlend();
                 }
             }
+        }
+    }
+
+    // ========== TerminalEntry ==========
+
+    private static class TerminalEntry {
+        final BlockPos pos;
+        String name;
+        final int index;
+        TerminalEntry(BlockPos pos, String name, int index) {
+            this.pos = pos; this.name = name; this.index = index;
         }
     }
 
