@@ -2,8 +2,11 @@ package com.github.haoyiyu.create_headsupdisplay.registration;
 
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
 import com.github.haoyiyu.create_headsupdisplay.item.HeadMountDisplayItem;
+import com.github.haoyiyu.create_headsupdisplay.item.ImagePluginItem;
 import com.github.haoyiyu.create_headsupdisplay.item.LinkBlockItem;
 import com.github.haoyiyu.create_headsupdisplay.item.OmniCoreItem;
+import com.github.haoyiyu.create_headsupdisplay.item.PluginBaseItem;
+import com.github.haoyiyu.create_headsupdisplay.item.RadarPluginItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.neoforged.neoforge.registries.DeferredItem;
@@ -27,6 +30,15 @@ public class ModItems {
 
     public static final DeferredItem<BlockItem> DISPLAY_ITEM = ITEMS.register("display",
             () -> new BlockItem(ModBlocks.DISPLAY.get(), new Item.Properties()));
+
+    public static final DeferredItem<ImagePluginItem> IMAGE_PLUGIN = ITEMS.register("image_plugin",
+            () -> new ImagePluginItem(new Item.Properties().stacksTo(16)));
+
+    public static final DeferredItem<RadarPluginItem> RADAR_PLUGIN = ITEMS.register("radar_plugin",
+            () -> new RadarPluginItem(new Item.Properties().stacksTo(16)));
+
+    public static final DeferredItem<PluginBaseItem> PLUGIN_BASE = ITEMS.register("plugin_base",
+            () -> new PluginBaseItem(new Item.Properties().stacksTo(64)));
 
     public static void register(net.neoforged.bus.api.IEventBus bus) {
         ITEMS.register(bus);

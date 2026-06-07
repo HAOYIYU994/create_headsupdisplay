@@ -43,10 +43,14 @@ public class OmniCoreScreen extends Screen {
     private boolean autoSort = true;
     private boolean renameMode = false;
     private String renameInput = "";
+    private boolean hasImagePlugin = false;
+    private boolean hasRadarPlugin = false;
 
     public OmniCoreScreen(CompoundTag data) {
         super(Component.translatable("gui.create_headsupdisplay.omni_core.title"));
         this.corePos = BlockPos.of(data.getLong("CorePos"));
+        this.hasImagePlugin = data.getBoolean("HasImagePlugin");
+        this.hasRadarPlugin = data.getBoolean("HasRadarPlugin");
         if (data.contains("BoundTerminalsList")) {
             ListTag terminalsTag = data.getList("BoundTerminalsList", Tag.TAG_COMPOUND);
             for (int i = 0; i < terminalsTag.size(); i++) {
@@ -104,7 +108,8 @@ public class OmniCoreScreen extends Screen {
             ListTag radarSlotTag = data.getList("RadarSlots", Tag.TAG_COMPOUND);
             for (int i = 0; i < radarSlotTag.size(); i++) {
                 CompoundTag slotTag = radarSlotTag.getCompound(i);
-                SourceEntry entry = new SourceEntry("§a[Radar]", ItemStack.EMPTY, ItemStack.EMPTY, 0, "Radar Display", null, null);
+                SourceEntry entry = new SourceEntry("", ItemStack.EMPTY, ItemStack.EMPTY, 0,
+                        Component.translatable("gui.create_headsupdisplay.radar_display").getString(), null, null);
                 entry.isRadar = true;
                 entry.radarIndex = i;
                 entry.radarPosX = slotTag.getInt("PosX");
@@ -121,25 +126,34 @@ public class OmniCoreScreen extends Screen {
     @Override
     protected void init() {
         super.init();
+        int y = 10;
         addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.add_source"), b -> {
             PacketDistributor.sendToServer(new RequestOpenFrequencySelectionPayload(corePos));
-        }).bounds(10, 10, 100, 20).build());
+        }).bounds(10, y, 100, 20).build());
+        y += 24;
 
-        // 添加图片按钮 → 打开子菜单
-        addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.display_terminal.add_image"), b -> {
-            Minecraft.getInstance().setScreen(new ImageUploadScreen(this));
-        }).bounds(10, 34, 100, 20).build());
-
-        // 扫描附近雷达
-        addRenderableWidget(Button.builder(Component.literal("Scan Radar"), b -> {
-            PacketDistributor.sendToServer(new ScanRadarPayload(corePos));
-        }).bounds(10, 58, 100, 20).build());
+        if (hasImagePlugin) {
+            addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.display_terminal.add_image"), b -> {
+                Minecraft.getInstance().setScreen(new ImageUploadScreen(this));
+            }).bounds(10, y, 100, 20).build());
+            y += 24;
+        }
+        if (hasRadarPlugin) {
+            addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.scan_radar"), b -> {
+                PacketDistributor.sendToServer(new ScanRadarPayload(corePos));
+            }).bounds(10, y, 100, 20).build());
+            y += 24;
+        }
+        addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.plugins"), b -> {
+            PacketDistributor.sendToServer(new RequestOpenPluginSlotsPayload(corePos));
+        }).bounds(10, y, 100, 20).build());
+        y += 24;
 
         addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.sort_on"), b -> {
             PacketDistributor.sendToServer(new ToggleAutoSortPayload(corePos));
             autoSort = !autoSort;
             b.setMessage(Component.translatable(autoSort ? "gui.create_headsupdisplay.sort_on" : "gui.create_headsupdisplay.sort_off"));
-        }).bounds(10, 82, 100, 20).build());
+        }).bounds(10, y, 100, 20).build());
     }
 
     @Override
@@ -153,6 +167,8 @@ public class OmniCoreScreen extends Screen {
         CompoundTag synced = ClientOmniCoreData.getSourcesData(corePos);
         if (synced != null) {
             autoSort = synced.getBoolean("AutoSort");
+            hasImagePlugin = synced.getBoolean("HasImagePlugin");
+            hasRadarPlugin = synced.getBoolean("HasRadarPlugin");
             loadSourcesFromTag(synced);
         }
     }
@@ -185,7 +201,7 @@ public class OmniCoreScreen extends Screen {
         int termListY = height - 30 - terminalEntries.size() * 16;
         if (!terminalEntries.isEmpty()) {
             graphics.fill(termListX - 2, termListY - 16, termListX + termW + 2, height, 0xCC222222);
-            graphics.drawString(font, "Terminals:", termListX, termListY - 14, 0xAAAAAA);
+            graphics.drawString(font, Component.translatable("gui.create_headsupdisplay.terminals").getString() + ":", termListX, termListY - 14, 0xAAAAAA);
             for (int i = 0; i < terminalEntries.size(); i++) {
                 var te = terminalEntries.get(i);
                 int ty = termListY + i * 16;
@@ -199,7 +215,7 @@ public class OmniCoreScreen extends Screen {
             int allY = termListY + terminalEntries.size() * 16 + 2;
             boolean allSel = selectedTerminal < 0;
             graphics.fill(termListX, allY, termListX + termW, allY + 14, allSel ? 0xFF006600 : 0xFF333333);
-            graphics.drawString(font, "→ All", termListX + 2, allY + 3, allSel ? 0x00FF00 : 0xAAAAAA);
+            graphics.drawString(font, Component.translatable("gui.create_headsupdisplay.all_terminals").getString(), termListX + 2, allY + 3, allSel ? 0x00FF00 : 0xAAAAAA);
         }
 
         // ===== 终端重命名 =====
@@ -208,7 +224,7 @@ public class OmniCoreScreen extends Screen {
             int rnX = termListX;
             int rnY = termListY - 44;
             graphics.fill(rnX - 2, rnY - 2, rnX + termW + 2, rnY + 30, 0xCC333333);
-            graphics.drawString(font, "Rename:", rnX, rnY, 0xFFFFFF);
+            graphics.drawString(font, Component.translatable("gui.create_headsupdisplay.rename").getString() + ":", rnX, rnY, 0xFFFFFF);
             graphics.drawString(font, "[" + renameInput + "_]", rnX, rnY + 14, 0x00FF00);
             graphics.fill(rnX, rnY + 26, rnX + 50, rnY + 30, 0xFF006600);
             graphics.drawString(font, "OK", rnX + 16, rnY + 26, 0xFFFFFF);
@@ -267,8 +283,13 @@ public class OmniCoreScreen extends Screen {
                 if (!src.freqItem2.isEmpty()) graphics.renderItem(src.freqItem2, icon2X, iconY);
             }
 
+            // 检查插件支持
+            boolean unsupported = (src.isImage && !hasImagePlugin) || (src.isRadar && !hasRadarPlugin);
+
             String display;
-            if (src.isImage) {
+            if (unsupported) {
+                display = Component.translatable("gui.create_headsupdisplay.unsupported_plugin").getString();
+            } else if (src.isImage) {
                 display = "[IMG] " + (src.imageFileName != null ? src.imageFileName : src.name);
             } else if (src.isRadar) {
                 display = "[Radar] (" + src.radarPosX + ", " + src.radarPosY + ")";
@@ -278,7 +299,7 @@ public class OmniCoreScreen extends Screen {
                 display = src.name + ": " + src.display;
             }
             display = display.replaceAll("§[0-9a-fk-or]", "");
-            // 超长文本滚动显示
+            int textColor = unsupported ? 0xFF5555 : 0xFFFFFF;
             int maxTextWidth = (width - 120) - startX - 4;
             int textWidth = font.width(display);
             if (textWidth > maxTextWidth) {
@@ -286,28 +307,30 @@ public class OmniCoreScreen extends Screen {
                 int scrollMax = textWidth - maxTextWidth + 20;
                 int offset = (tickCounter * scrollSpeed) % scrollMax;
                 graphics.enableScissor(startX, y, width - 120, y + ENTRY_HEIGHT);
-                graphics.drawString(font, display, startX - offset, y + 5, 0xFFFFFF);
+                graphics.drawString(font, display, startX - offset, y + 5, textColor);
                 graphics.disableScissor();
             } else {
-                graphics.drawString(font, display, startX, y + 5, 0xFFFFFF);
+                graphics.drawString(font, display, startX, y + 5, textColor);
             }
 
-            if (src.isImage) {
-                int detailBtnX = width - 120;
-                graphics.fill(detailBtnX, y, detailBtnX + 30, y + 20, 0xAA4444AA);
-                graphics.drawString(font, "D", detailBtnX + 11, y + 6, 0xFFFFFF);
-            } else if (src.isRadar) {
-                // 雷达不需要转译按钮，留空
-            } else if (src.dlText == null) {
-                int transBtnX = width - 120;
-                graphics.fill(transBtnX, y, transBtnX + 30, y + 20, src.trans ? 0xAAFFA500 : 0xAA555555);
-                graphics.drawString(font, "T", transBtnX + 11, y + 6, 0xFFFFFF);
+            if (!unsupported) {
+                if (src.isImage) {
+                    int detailBtnX = width - 120;
+                    graphics.fill(detailBtnX, y, detailBtnX + 30, y + 20, 0xAA4444AA);
+                    graphics.drawString(font, "D", detailBtnX + 11, y + 6, 0xFFFFFF);
+                } else if (src.isRadar) {
+                } else if (src.dlText == null) {
+                    int transBtnX = width - 120;
+                    graphics.fill(transBtnX, y, transBtnX + 30, y + 20, src.trans ? 0xAAFFA500 : 0xAA555555);
+                    graphics.drawString(font, "T", transBtnX + 11, y + 6, 0xFFFFFF);
+                }
+
+                int sendBtnX = width - 80;
+                graphics.fill(sendBtnX, y, sendBtnX + 30, y + 20, 0xAA00AA00);
+                graphics.drawString(font, Component.translatable("gui.create_headsupdisplay.send").getString(), sendBtnX + 5, y + 6, 0xFFFFFF);
             }
 
-            int sendBtnX = width - 80;
             int delBtnX = width - 40;
-            graphics.fill(sendBtnX, y, sendBtnX + 30, y + 20, 0xAA00AA00);
-            graphics.drawString(font, Component.translatable("gui.create_headsupdisplay.send").getString(), sendBtnX + 5, y + 6, 0xFFFFFF);
             graphics.fill(delBtnX, y, delBtnX + 30, y + 20, 0xAAFF0000);
             graphics.drawString(font, Component.translatable("gui.create_headsupdisplay.delete").getString(), delBtnX + 5, y + 6, 0xFFFFFF);
         }
@@ -362,8 +385,8 @@ public class OmniCoreScreen extends Screen {
         for (int i = 0; i < sources.size(); i++) {
             int y = startY + i * ENTRY_HEIGHT - scrollOffset;
             if (y < 0 || y > height) continue;
-            // IMAGE 详情按钮
-            if (sources.get(i).isImage && mouseX >= width - 120 && mouseX <= width - 90 && mouseY >= y && mouseY <= y + 20) {
+            // IMAGE 详情按钮（仅插件存在时）
+            if (sources.get(i).isImage && hasImagePlugin && mouseX >= width - 120 && mouseX <= width - 90 && mouseY >= y && mouseY <= y + 20) {
                 final int idx = i;
                 SourceEntry entry = sources.get(idx);
                 Minecraft.getInstance().setScreen(new ImageDetailScreen(entry));
@@ -381,10 +404,14 @@ public class OmniCoreScreen extends Screen {
                 return true;
             }
             if (mouseX >= width - 80 && mouseX <= width - 50 && mouseY >= y && mouseY <= y + 20) {
-                if (sources.get(i).isRadar) {
-                    PacketDistributor.sendToServer(new PushRadarSlotsPayload(corePos, selectedTerminal));
-                } else {
-                    PacketDistributor.sendToServer(new SendSourceToTerminalPayload(corePos, i, selectedTerminal));
+                SourceEntry se = sources.get(i);
+                boolean unsup = (se.isImage && !hasImagePlugin) || (se.isRadar && !hasRadarPlugin);
+                if (!unsup) {
+                    if (se.isRadar) {
+                        PacketDistributor.sendToServer(new PushRadarSlotsPayload(corePos, selectedTerminal));
+                    } else {
+                        PacketDistributor.sendToServer(new SendSourceToTerminalPayload(corePos, i, selectedTerminal));
+                    }
                 }
                 return true;
             }

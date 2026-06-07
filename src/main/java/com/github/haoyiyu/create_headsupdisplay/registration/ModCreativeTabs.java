@@ -24,6 +24,10 @@ public class ModCreativeTabs {
                         output.accept(ModItems.DISPLAY_TERMINAL_ITEM.get());
                         output.accept(ModItems.OMNI_CORE_ITEM.get());
                         output.accept(ModItems.LINK_BLOCK_ITEM.get());
+                        output.accept(ModItems.DISPLAY_ITEM.get());
+                        output.accept(ModItems.IMAGE_PLUGIN.get());
+                        output.accept(ModItems.RADAR_PLUGIN.get());
+                        output.accept(ModItems.PLUGIN_BASE.get());
                     })
                     .build()
     );

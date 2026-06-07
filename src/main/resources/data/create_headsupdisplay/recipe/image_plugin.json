@@ -1,0 +1,66 @@
+{
+  "type": "create:sequenced_assembly",
+  "ingredient": {
+    "item": "create_headsupdisplay:plugin_base"
+  },
+  "loops": 1,
+  "results": [
+    {
+      "id": "create_headsupdisplay:image_plugin"
+    }
+  ],
+  "sequence": [
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        { "item": "create_headsupdisplay:plugin_base" },
+        { "item": "create:empty_schematic" }
+      ],
+      "results": [
+        { "id": "create_headsupdisplay:plugin_base" }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        { "item": "create_headsupdisplay:plugin_base" },
+        { "tag": "c:nuggets/brass" }
+      ],
+      "results": [
+        { "id": "create_headsupdisplay:plugin_base" }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        { "item": "create_headsupdisplay:plugin_base" },
+        { "item": "create:precision_mechanism" }
+      ],
+      "results": [
+        { "id": "create_headsupdisplay:plugin_base" }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        { "item": "create_headsupdisplay:plugin_base" },
+        { "item": "create:crafter_slot_cover" }
+      ],
+      "results": [
+        { "id": "create_headsupdisplay:plugin_base" }
+      ]
+    },
+    {
+      "type": "create:pressing",
+      "ingredients": [
+        { "item": "create_headsupdisplay:plugin_base" }
+      ],
+      "results": [
+        { "id": "create_headsupdisplay:image_plugin" }
+      ]
+    }
+  ],
+  "transitional_item": {
+    "id": "create_headsupdisplay:plugin_base"
+  }
+}

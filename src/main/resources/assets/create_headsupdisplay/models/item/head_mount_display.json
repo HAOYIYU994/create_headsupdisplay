@@ -1,7 +1,6 @@
 {
 	"format_version": "1.9.0",
 	"credit": "Made with Blockbench",
-	"parent": "head_mount_display",
 	"textures": {
 		"0": "create:block/redstone_bridge_powered",
 		"1": "create:block/flap_display_front",

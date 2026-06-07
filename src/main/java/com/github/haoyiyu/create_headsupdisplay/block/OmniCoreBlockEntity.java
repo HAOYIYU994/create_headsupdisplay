@@ -29,15 +29,78 @@ import java.util.Map;
 import java.util.UUID;
 
 public class OmniCoreBlockEntity extends BlockEntity {
-    private boolean autoSortEnabled = true; // 自动置顶开关
+    private boolean autoSortEnabled = true;
     private List<BlockPos> boundTerminals = new ArrayList<>();
-    private Map<BlockPos, String> terminalNames = new HashMap<>(); // 终端名称
+    private Map<BlockPos, String> terminalNames = new HashMap<>();
     private List<RedstoneSource> sources = new ArrayList<>();
     private Map<Integer, BlockPos> sentSources = new HashMap<>();
 
     // 雷达图槽位
     private List<RadarSlot> radarSlots = new ArrayList<>();
     private BlockPos linkedMonitorPos;
+
+    // 插件存储（27格箱子）
+    private net.minecraft.world.SimpleContainer pluginInventory = new net.minecraft.world.SimpleContainer(27) {
+        @Override public void setChanged() { OmniCoreBlockEntity.this.setChanged(); }
+    };
+
+    public boolean hasImagePlugin() {
+        for (int i = 0; i < pluginInventory.getContainerSize(); i++)
+            if (pluginInventory.getItem(i).getItem() instanceof com.github.haoyiyu.create_headsupdisplay.item.ImagePluginItem)
+                return true;
+        return false;
+    }
+
+    public boolean hasRadarPlugin() {
+        for (int i = 0; i < pluginInventory.getContainerSize(); i++)
+            if (pluginInventory.getItem(i).getItem() instanceof com.github.haoyiyu.create_headsupdisplay.item.RadarPluginItem)
+                return true;
+        return false;
+    }
+
+    public net.minecraft.world.SimpleContainer getPluginInventory() { return pluginInventory; }
+
+    public net.minecraft.core.NonNullList<ItemStack> getPluginSlots() {
+        net.minecraft.core.NonNullList<ItemStack> list = net.minecraft.core.NonNullList.withSize(27, ItemStack.EMPTY);
+        for (int i = 0; i < 27; i++) list.set(i, pluginInventory.getItem(i));
+        return list;
+    }
+
+    public void setPluginSlot(int slot, ItemStack stack) {
+        if (slot >= 0 && slot < 27) { pluginInventory.setItem(slot, stack.copyWithCount(1)); setChanged(); }
+    }
+
+    public ItemStack removePluginSlot(int slot) {
+        if (slot >= 0 && slot < 27) {
+            ItemStack ret = pluginInventory.getItem(slot).copy();
+            pluginInventory.setItem(slot, ItemStack.EMPTY);
+            setChanged();
+            return ret;
+        }
+        return ItemStack.EMPTY;
+    }
+
+    /** 图片插件被拔出 → 通知所有终端删除图片槽位 */
+    public void cleanupImageSources() {
+        for (BlockPos tp : boundTerminals) {
+            BlockEntity be = level.getBlockEntity(tp);
+            if (be instanceof DisplayTerminalBlockEntity terminal) {
+                for (var img : new ArrayList<>(terminal.getImageSlots()))
+                    terminal.removeImageSlot(img.getImageId());
+            }
+        }
+        sentSources.clear();
+    }
+
+    /** 雷达插件被拔出 → 清空终端雷达槽位 */
+    public void cleanupRadarSources() {
+        for (BlockPos tp : boundTerminals) {
+            BlockEntity be = level.getBlockEntity(tp);
+            if (be instanceof DisplayTerminalBlockEntity terminal) {
+                terminal.setRadarSlots(new ArrayList<>());
+            }
+        }
+    }
 
     public OmniCoreBlockEntity(BlockPos pos, BlockState state) {
         super(ModBlockEntities.OMNI_CORE.get(), pos, state);
@@ -107,7 +170,10 @@ public class OmniCoreBlockEntity extends BlockEntity {
         for (BlockPos tp : targets) {
             BlockEntity be = level.getBlockEntity(tp);
             if (be instanceof DisplayTerminalBlockEntity terminal) {
-                terminal.setRadarSlots(new ArrayList<>(radarSlots));
+                // 深拷贝：每个终端独立 RadarSlot 对象
+                List<RadarSlot> copy = new ArrayList<>();
+                for (RadarSlot s : radarSlots) copy.add(RadarSlot.deserialize(s.serialize()));
+                terminal.setRadarSlots(copy);
             }
         }
     }
@@ -126,6 +192,9 @@ public class OmniCoreBlockEntity extends BlockEntity {
             if (!boundTerminals.isEmpty()) {
                 data.putLong("BoundTerminal", boundTerminals.get(0).asLong());
             }
+            data.putBoolean("HasImagePlugin", hasImagePlugin());
+            data.putBoolean("HasRadarPlugin", hasRadarPlugin());
+
             ListTag terminalsTag = new ListTag();
             for (BlockPos tp : boundTerminals) {
                 CompoundTag tt = new CompoundTag();
@@ -364,7 +433,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
     public void addOrUpdateDisplayLinkSource(BlockPos sourcePos, String name, String text) {
         for (int i = 0; i < sources.size(); i++) {
             RedstoneSource src = sources.get(i);
-            if (sourcePos.equals(src.displayLinkSourcePos)) {
+            if (src.sourceType == RedstoneSource.Type.DISPLAY_LINK && name.equals(src.name)) {
                 if (!text.equals(src.displayLinkText)) {
                     src.displayLinkText = text;
                     if (autoSortEnabled) moveToTop(i);
@@ -436,12 +505,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
             return;
         }
 
-        BlockPos virtualPos;
-        if (src.displayLinkSourcePos != null) {
-            virtualPos = new BlockPos(src.displayLinkSourcePos.hashCode(), 0, 0);
-        } else {
-            virtualPos = new BlockPos(0, 0, Math.abs(src.name.hashCode()));
-        }
+        BlockPos virtualPos = new BlockPos(0, 0, Math.abs(src.name.hashCode()));
 
         String displayText = src.displayLinkText != null ? src.displayLinkText : getDisplayText(src);
 
@@ -650,6 +714,12 @@ public class OmniCoreBlockEntity extends BlockEntity {
         if (linkedMonitorPos != null) {
             tag.putLong("LinkedMonitorPos", linkedMonitorPos.asLong());
         }
+        // 插件槽位
+        ListTag pluginTag = new ListTag();
+        for (int i = 0; i < 27; i++) {
+            pluginTag.add(pluginInventory.getItem(i).saveOptional(registries));
+        }
+        tag.put("Plugins", pluginTag);
     }
 
     @Override
@@ -719,6 +789,13 @@ public class OmniCoreBlockEntity extends BlockEntity {
             linkedMonitorPos = BlockPos.of(tag.getLong("LinkedMonitorPos"));
         } else {
             linkedMonitorPos = null;
+        }
+        // 插件槽位
+        if (tag.contains("Plugins")) {
+            ListTag pluginTag = tag.getList("Plugins", Tag.TAG_COMPOUND);
+            for (int i = 0; i < Math.min(pluginTag.size(), 27); i++) {
+                pluginInventory.setItem(i, ItemStack.parseOptional(registries, pluginTag.getCompound(i)));
+            }
         }
     }
 

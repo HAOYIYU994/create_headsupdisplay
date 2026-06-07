@@ -213,7 +213,7 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
         RenderSystem.setShader(GameRenderer::getPositionTexShader);
         RenderSystem.setShaderColor(0f, 0.8f, 0f, 0.3f * slot.alpha / 255f);
         pose.pushPose();
-        pose.translate(cx, cy, 0.005f);
+        pose.translate(cx, cy, 0.05f);
         pose.mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-sweepAngle));
         pose.translate(-cx, -cy, 0);
         drawTexturedQuad(pose, dx, dy, size, size);
@@ -221,7 +221,9 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
 
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
 
-        // 目标标记
+        // 目标标记（向前移确保在扫面线上方）
+        pose.pushPose();
+        pose.translate(0, 0, 0.1f);
         if (tracks != null && !tracks.isEmpty()) {
             float trackSize = Math.max(2f, 4f * s);
             for (var track : tracks) {
@@ -274,6 +276,7 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
             }
             RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         }
+        pose.popPose();
 
         RenderSystem.disableBlend();
         pose.popPose();

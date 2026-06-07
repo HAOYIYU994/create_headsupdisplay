@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "create:transmitter" },
+    { "item": "create:electron_tube" }
+  ],
+  "result": {
+    "id": "create_headsupdisplay:link_block",
+    "count": 1
+  }
+}

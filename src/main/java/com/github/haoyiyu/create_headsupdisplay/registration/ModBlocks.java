@@ -17,7 +17,7 @@ public class ModBlocks {
     public static final DeferredBlock<DisplayTerminalBlock> DISPLAY_TERMINAL = BLOCKS.registerBlock("display_terminal",
             DisplayTerminalBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).requiresCorrectToolForDrops());
 
-    // 新增：万物互联核心方块
+    // 数据集成核心方块
     public static final DeferredBlock<OmniCoreBlock> OMNI_CORE = BLOCKS.registerBlock("omni_core",
             OmniCoreBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).strength(3.0f));
 

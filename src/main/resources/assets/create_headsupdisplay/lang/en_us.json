@@ -3,19 +3,22 @@
 
   "item.create_headsupdisplay.head_mount_display": "Head Mount Display",
   "block.create_headsupdisplay.display_terminal": "Display Terminal",
-  "block.create_headsupdisplay.omni_core": "Omni Core",
+  "block.create_headsupdisplay.omni_core": "Data Integration Core",
   "block.create_headsupdisplay.link_block": "Link Block",
   "block.create_headsupdisplay.display": "Display",
+  "item.create_headsupdisplay.image_plugin": "Image Plugin",
+  "item.create_headsupdisplay.radar_plugin": "Radar Plugin",
+  "item.create_headsupdisplay.plugin_base": "Plugin Base",
 
   "message.create_headsupdisplay.bound": "Glasses bound to terminal",
   "message.create_headsupdisplay.bind_mode": "Right-click a Display Terminal to bind",
-  "message.create_headsupdisplay.link_set": "Linked to Omni Core at %s",
-  "message.create_headsupdisplay.link_clear": "Cleared linked Omni Core",
-  "message.create_headsupdisplay.link_success": "Bound terminal to Omni Core",
-  "message.create_headsupdisplay.link_monitor": "Radar Monitor bound to Omni Core at %s",
+  "message.create_headsupdisplay.link_set": "Linked to Data Integration Core at %s",
+  "message.create_headsupdisplay.link_clear": "Cleared linked Data Integration Core",
+  "message.create_headsupdisplay.link_success": "Bound terminal to Data Integration Core",
+  "message.create_headsupdisplay.link_monitor": "Radar Monitor bound to Data Integration Core at %s",
   "message.create_headsupdisplay.source_sent": "Source sent to terminal",
 
-  "gui.create_headsupdisplay.omni_core.title": "Omni Core",
+  "gui.create_headsupdisplay.omni_core.title": "Data Integration Core",
   "gui.create_headsupdisplay.add_source": "Add Source",
   "gui.create_headsupdisplay.signal_sources": "Signal Sources",
   "gui.create_headsupdisplay.signal_name": "Signal Name",
@@ -56,5 +59,13 @@
   "tooltip.create_headsupdisplay.head_mount_display.line2": "§8» §7Right-click+shift on a Display Terminal to link",
   "tooltip.create_headsupdisplay.head_mount_display.line3": "§8» §7Supports customizable HUD layouts",
 
-  "hud.create_headsupdisplay.progress": "%d%%"
+  "hud.create_headsupdisplay.progress": "%d%%",
+
+  "gui.create_headsupdisplay.scan_radar": "Scan Radar",
+  "gui.create_headsupdisplay.plugins": "Plugins",
+  "gui.create_headsupdisplay.terminals": "Terminals",
+  "gui.create_headsupdisplay.unsupported_plugin": "[Unsupported] Missing Plugin",
+  "gui.create_headsupdisplay.rename": "Rename",
+  "gui.create_headsupdisplay.radar_display": "Radar Display",
+  "gui.create_headsupdisplay.all_terminals": "→ All"
 }

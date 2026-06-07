@@ -5,6 +5,7 @@ import com.github.haoyiyu.create_headsupdisplay.block.OmniCoreDisplayTarget;
 import com.github.haoyiyu.create_headsupdisplay.client.HeadMountDisplayClient;
 import com.github.haoyiyu.create_headsupdisplay.menu.DisplayTerminalScreen;
 import com.github.haoyiyu.create_headsupdisplay.screen.FrequencySelectionScreen;
+import com.github.haoyiyu.create_headsupdisplay.screen.PluginSlotScreen;
 import com.github.haoyiyu.create_headsupdisplay.registration.*;
 import com.simibubi.create.api.behaviour.display.DisplayTarget;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlockEntity;
@@ -110,6 +111,7 @@ public class CreateHeadsUpDisplay {
         public static void onRegisterScreens(RegisterMenuScreensEvent event) {
             event.register(ModMenus.DISPLAY_TERMINAL_MENU.get(), DisplayTerminalScreen::new);
             event.register(ModMenus.FREQUENCY_SELECTION_MENU.get(), FrequencySelectionScreen::new);
+            event.register(ModMenus.PLUGIN_SLOT_MENU.get(), PluginSlotScreen::new);
         }
 
         @SubscribeEvent

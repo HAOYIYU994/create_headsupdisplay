@@ -1,0 +1,26 @@
+{
+  "type": "create:mechanical_crafting",
+  "accept_mirrored": false,
+  "category": "misc",
+  "pattern": [
+    "EDDE",
+    "BLTB",
+    "BPSB",
+    "BCAB"
+  ],
+  "key": {
+    "E": { "item": "create:electron_tube" },
+    "D": { "item": "create_headsupdisplay:display" },
+    "B": { "item": "create:brass_casing" },
+    "L": { "item": "create:redstone_link" },
+    "T": { "item": "create:transmitter" },
+    "P": { "item": "create:precision_mechanism" },
+    "S": { "item": "create:schedule" },
+    "C": { "item": "create:linked_controller" },
+    "A": { "item": "create:analog_lever" }
+  },
+  "result": {
+    "id": "create_headsupdisplay:omni_core",
+    "count": 1
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " L ",
+    " G ",
+    " D "
+  ],
+  "key": {
+    "L": { "item": "create_headsupdisplay:link_block" },
+    "G": { "item": "create:goggles" },
+    "D": { "item": "create_headsupdisplay:display" }
+  },
+  "result": {
+    "id": "create_headsupdisplay:head_mount_display",
+    "count": 1
+  }
+}

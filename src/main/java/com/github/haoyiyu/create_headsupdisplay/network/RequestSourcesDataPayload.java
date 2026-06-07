@@ -60,6 +60,8 @@ public record RequestSourcesDataPayload(BlockPos corePos) implements CustomPacke
                         list.add(tag);
                     }
                     data.putBoolean("AutoSort", core.isAutoSortEnabled());
+                    data.putBoolean("HasImagePlugin", core.hasImagePlugin());
+                    data.putBoolean("HasRadarPlugin", core.hasRadarPlugin());
                     data.put("Sources", list);
                     // 雷达槽位
                     ListTag radarSlotTag = new ListTag();

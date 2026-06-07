@@ -94,7 +94,7 @@ public class NetworkHandler {
                 })
         );
 
-        // ========== 万物互联核心网络包 ==========
+        // ========== 数据集成核心网络包 ==========
         // 打开核心配置屏幕（服务端 -> 客户端）
         registrar.playToClient(
                 OpenOmniCoreScreenPayload.TYPE,
@@ -250,6 +250,13 @@ public class NetworkHandler {
                 SetTerminalNamePayload.TYPE,
                 SetTerminalNamePayload.CODEC,
                 SetTerminalNamePayload::handle
+        );
+
+        // 请求打开插件槽位（客户端 -> 服务端）
+        registrar.playToServer(
+                RequestOpenPluginSlotsPayload.TYPE,
+                RequestOpenPluginSlotsPayload.CODEC,
+                RequestOpenPluginSlotsPayload::handle
         );
 
     }

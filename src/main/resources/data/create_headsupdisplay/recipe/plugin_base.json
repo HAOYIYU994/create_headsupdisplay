@@ -1,0 +1,46 @@
+{
+  "type": "create:sequenced_assembly",
+  "ingredient": {
+    "item": "create:sturdy_sheet"
+  },
+  "loops": 1,
+  "results": [
+    {
+      "id": "create_headsupdisplay:plugin_base"
+    }
+  ],
+  "sequence": [
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        { "item": "create:sturdy_sheet" },
+        { "item": "create:brass_sheet" }
+      ],
+      "results": [
+        { "id": "create:sturdy_sheet" }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        { "item": "create:sturdy_sheet" },
+        { "item": "create:sturdy_sheet" }
+      ],
+      "results": [
+        { "id": "create:sturdy_sheet" }
+      ]
+    },
+    {
+      "type": "create:pressing",
+      "ingredients": [
+        { "item": "create:sturdy_sheet" }
+      ],
+      "results": [
+        { "id": "create_headsupdisplay:plugin_base" }
+      ]
+    }
+  ],
+  "transitional_item": {
+    "id": "create:sturdy_sheet"
+  }
+}

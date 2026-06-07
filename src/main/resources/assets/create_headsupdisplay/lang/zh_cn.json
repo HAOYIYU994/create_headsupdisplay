@@ -3,19 +3,22 @@
 
   "item.create_headsupdisplay.head_mount_display": "头戴显示器",
   "block.create_headsupdisplay.display_terminal": "显示终端",
-  "block.create_headsupdisplay.omni_core": "万物互联核心",
+  "block.create_headsupdisplay.omni_core": "数据集成核心",
   "block.create_headsupdisplay.link_block": "链接方块",
   "block.create_headsupdisplay.display": "显示器",
+  "item.create_headsupdisplay.image_plugin": "图像插件",
+  "item.create_headsupdisplay.radar_plugin": "雷达插件",
+  "item.create_headsupdisplay.plugin_base": "插件底板",
 
   "message.create_headsupdisplay.bound": "护目镜已绑定到终端",
   "message.create_headsupdisplay.bind_mode": "右键点击显示终端以绑定",
-  "message.create_headsupdisplay.link_set": "已连接到位于 %s 的万物互联核心",
-  "message.create_headsupdisplay.link_clear": "已清除连接的万物互联核心",
-  "message.create_headsupdisplay.link_success": "终端已绑定到万物互联核心",
-  "message.create_headsupdisplay.link_monitor": "雷达监视器已绑定到位于 %s 的万物互联核心",
+  "message.create_headsupdisplay.link_set": "已连接到位于 %s 的数据集成核心",
+  "message.create_headsupdisplay.link_clear": "已清除连接的数据集成核心",
+  "message.create_headsupdisplay.link_success": "终端已绑定到数据集成核心",
+  "message.create_headsupdisplay.link_monitor": "雷达监视器已绑定到位于 %s 的数据集成核心",
   "message.create_headsupdisplay.source_sent": "信号源已发送到终端",
 
-  "gui.create_headsupdisplay.omni_core.title": "万物互联核心",
+  "gui.create_headsupdisplay.omni_core.title": "数据集成核心",
   "gui.create_headsupdisplay.add_source": "添加信号源",
   "gui.create_headsupdisplay.signal_sources": "信号源",
   "gui.create_headsupdisplay.signal_name": "信号名称",
@@ -56,5 +59,13 @@
   "tooltip.create_headsupdisplay.head_mount_display.line2": "§8» §7shift+右键点击显示终端以绑定",
   "tooltip.create_headsupdisplay.head_mount_display.line3": "§8» §7支持可定制的HUD布局",
 
-  "hud.create_headsupdisplay.progress": "%d%%"
+  "hud.create_headsupdisplay.progress": "%d%%",
+
+  "gui.create_headsupdisplay.scan_radar": "扫描雷达",
+  "gui.create_headsupdisplay.plugins": "插件",
+  "gui.create_headsupdisplay.terminals": "终端列表",
+  "gui.create_headsupdisplay.unsupported_plugin": "[不支持] 缺少插件",
+  "gui.create_headsupdisplay.rename": "重命名",
+  "gui.create_headsupdisplay.radar_display": "雷达显示",
+  "gui.create_headsupdisplay.all_terminals": "→ 全部"
 }

@@ -40,11 +40,9 @@ public class OmniCoreBlock extends Block implements EntityBlock {
 
     @Override
     protected net.minecraft.world.ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hitResult) {
-        // 手持链接方块时跳过默认交互，交给 LinkBlockItem.useOn 处理
         if (stack.getItem() instanceof LinkBlockItem) {
             return net.minecraft.world.ItemInteractionResult.SKIP_DEFAULT_BLOCK_INTERACTION;
         }
-        // 其他物品：走默认 useWithoutItem 逻辑
         return net.minecraft.world.ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
     }
 

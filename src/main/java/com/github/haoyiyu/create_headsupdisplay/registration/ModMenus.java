@@ -3,6 +3,7 @@ package com.github.haoyiyu.create_headsupdisplay.registration;
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
 import com.github.haoyiyu.create_headsupdisplay.menu.DisplayTerminalMenu;
 import com.github.haoyiyu.create_headsupdisplay.menu.FrequencySelectionMenu;
+import com.github.haoyiyu.create_headsupdisplay.menu.PluginSlotMenu;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.flag.FeatureFlags;
@@ -20,6 +21,10 @@ public class ModMenus {
     public static final DeferredHolder<MenuType<?>, MenuType<FrequencySelectionMenu>> FREQUENCY_SELECTION_MENU =
             MENUS.register("frequency_selection_menu",
                     () -> new MenuType<>(FrequencySelectionMenu::new, FeatureFlags.DEFAULT_FLAGS));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<PluginSlotMenu>> PLUGIN_SLOT_MENU =
+            MENUS.register("plugin_slot_menu",
+                    () -> new MenuType<>(PluginSlotMenu::new, FeatureFlags.DEFAULT_FLAGS));
 
     public static void register(net.neoforged.bus.api.IEventBus bus) {
         MENUS.register(bus);
