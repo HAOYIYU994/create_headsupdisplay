@@ -447,7 +447,7 @@ public class OmniCoreScreen extends Screen {
                 if (entry.isRadar) {
                     PacketDistributor.sendToServer(new RemoveRadarSlotPayload(corePos, entry.radarIndex));
                 } else {
-                    PacketDistributor.sendToServer(new RemoveRedstoneSourcePayload(corePos, i));
+                    PacketDistributor.sendToServer(new RemoveRedstoneSourcePayload(corePos, i, entry.name != null ? entry.name : ""));
                 }
                 sources.remove(i);
                 return true;

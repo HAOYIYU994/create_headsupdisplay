@@ -506,7 +506,7 @@ public class TerminalConfigScreen extends Screen {
                     slot.rotation %= 360;
                 } else {
                     float newScale = slot.scale + (float)(scrollDelta > 0 ? 0.1f : -0.1f);
-                    slot.scale = Math.min(Math.max(newScale, 0.5f), 2.0f);
+                    slot.scale = Math.min(Math.max(newScale, 0.1f), com.github.haoyiyu.create_headsupdisplay.config.ModConfig.MAX_SCALE.get().floatValue());
                 }
                 return true;
             }
@@ -521,7 +521,7 @@ public class TerminalConfigScreen extends Screen {
                     entry.rotation %= 360;
                 } else {
                     float newScale = entry.scale + (float)(scrollDelta > 0 ? 0.1f : -0.1f);
-                    entry.scale = Math.min(Math.max(newScale, 0.5f), 2.0f);
+                    entry.scale = Math.min(Math.max(newScale, 0.1f), com.github.haoyiyu.create_headsupdisplay.config.ModConfig.MAX_SCALE.get().floatValue());
                 }
                 return true;
             }
@@ -536,7 +536,7 @@ public class TerminalConfigScreen extends Screen {
                     entry.rotation %= 360;
                 } else {
                     float newScale = entry.scale + (float)(scrollDelta > 0 ? 0.1f : -0.1f);
-                    entry.scale = Math.min(Math.max(newScale, 0.1f), 5.0f);
+                    entry.scale = Math.min(Math.max(newScale, 0.1f), com.github.haoyiyu.create_headsupdisplay.config.ModConfig.MAX_SCALE.get().floatValue());
                 }
                 return true;
             }
@@ -550,7 +550,7 @@ public class TerminalConfigScreen extends Screen {
                     entry.rotation %= 360;
                 } else {
                     float newScale = entry.scale + (float)(scrollDelta > 0 ? 0.1f : -0.1f);
-                    entry.scale = Math.min(Math.max(newScale, 0.1f), 5.0f);
+                    entry.scale = Math.min(Math.max(newScale, 0.1f), com.github.haoyiyu.create_headsupdisplay.config.ModConfig.MAX_SCALE.get().floatValue());
                 }
                 return true;
             }

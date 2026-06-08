@@ -1,5 +1,8 @@
 {
   "variants": {
-    "": { "model": "create_headsupdisplay:block/omni_core" }
+    "facing=north": { "model": "create_headsupdisplay:block/omni_core", "y": 0 },
+    "facing=east":  { "model": "create_headsupdisplay:block/omni_core", "y": 90 },
+    "facing=south": { "model": "create_headsupdisplay:block/omni_core", "y": 180 },
+    "facing=west":  { "model": "create_headsupdisplay:block/omni_core", "y": 270 }
   }
 }

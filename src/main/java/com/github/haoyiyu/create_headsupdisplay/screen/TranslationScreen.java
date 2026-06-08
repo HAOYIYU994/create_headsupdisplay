@@ -30,9 +30,10 @@ public class TranslationScreen extends Screen {
         super.init();
         int cx = width / 2 - 100;
 
-        addRenderableWidget(Button.builder(Component.literal(modeLabel()), b -> {
+        addRenderableWidget(Button.builder(modeLabel(), b -> {
             config.setMode(TranslationConfig.Mode.values()[(config.getMode().ordinal() + 1) % 4]);
             if (config.getMode() == TranslationConfig.Mode.CONDITIONAL || config.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL) ensureRules();
+            b.setMessage(modeLabel());
             rebuild();
         }).bounds(cx, 10, 200, 20).build());
 
@@ -117,13 +118,14 @@ public class TranslationScreen extends Screen {
             row.ruleIndex = i;
 
             if (isElse) {
-                row.opBtn = addRenderableWidget(Button.builder(Component.literal((i == 0) ? "Else" : "Else"), b -> {})
+                row.opBtn = addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.translation.else"), b -> {})
                         .bounds(cx, y, 80, 20).build());
                 if (isImageMode) {
                     final int ri = i;
                     row.imgBtn = addRenderableWidget(Button.builder(
-                            Component.literal(rule.imageName.isEmpty() ? "[pick]" : rule.imageName), b ->
-                                openImagePicker(ri)
+                            Component.literal(rule.imageName.isEmpty()
+                                ? Component.translatable("gui.create_headsupdisplay.translation.pick_image").getString()
+                                : rule.imageName), b -> openImagePicker(ri)
                             ).bounds(cx + 85, y, 150, 20).build());
                 } else {
                     row.outBox = new EditBox(font, cx + 85, y, 150, 20, Component.literal("out"));
@@ -131,11 +133,15 @@ public class TranslationScreen extends Screen {
                     addRenderableWidget(row.outBox);
                 }
             } else {
-                String label = (i == 0) ? "If" : "ElsIf";
+                final boolean isFirst = (i == 0);
                 final int idx = i;
-                row.opBtn = addRenderableWidget(Button.builder(Component.literal(label + " " + opStr(rule.op)), b -> {
+                Component label = isFirst
+                    ? Component.translatable("gui.create_headsupdisplay.translation.if")
+                    : Component.translatable("gui.create_headsupdisplay.translation.else_if");
+                row.opBtn = addRenderableWidget(Button.builder(
+                        Component.literal(label.getString() + " " + opStr(rule.op)), b -> {
                     rule.op = TranslationConfig.ConditionalRule.Op.values()[(rule.op.ordinal() + 1) % 6];
-                    b.setMessage(Component.literal(label + " " + opStr(rule.op)));
+                    b.setMessage(Component.literal(label.getString() + " " + opStr(rule.op)));
                 }).bounds(cx, y, 80, 20).build());
 
                 row.valBox = new EditBox(font, cx + 85, y, 40, 20, Component.literal("val"));
@@ -145,8 +151,9 @@ public class TranslationScreen extends Screen {
                 if (isImageMode) {
                     final int ri = i;
                     row.imgBtn = addRenderableWidget(Button.builder(
-                            Component.literal(rule.imageName.isEmpty() ? "[pick]" : rule.imageName), b ->
-                                openImagePicker(ri)
+                            Component.literal(rule.imageName.isEmpty()
+                                ? Component.translatable("gui.create_headsupdisplay.translation.pick_image").getString()
+                                : rule.imageName), b -> openImagePicker(ri)
                             ).bounds(cx + 130, y, 100, 20).build());
                 } else {
                     row.outBox = new EditBox(font, cx + 130, y, 100, 20, Component.literal("out"));
@@ -167,7 +174,7 @@ public class TranslationScreen extends Screen {
 
         if (rules.size() < 10) {
             int btnY = 45 + rules.size() * 30 + 5;
-            addElseIfBtn = addRenderableWidget(Button.builder(Component.literal("+ Else If"), b -> {
+            addElseIfBtn = addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.translation.add_else_if"), b -> {
                 collectRowData();
                 rules.add(rules.size() - 1, new TranslationConfig.ConditionalRule(TranslationConfig.ConditionalRule.Op.EQUAL, 0, ""));
                 rebuildConditionRows();
@@ -212,12 +219,12 @@ public class TranslationScreen extends Screen {
         }
     }
 
-    private String modeLabel() {
+    private Component modeLabel() {
         return switch (config.getMode()) {
-            case NONE -> "Mode: Off";
-            case EXPRESSION -> "Mode: Expression";
-            case CONDITIONAL -> "Mode: Conditional";
-            case IMAGE_CONDITIONAL -> "Mode: ImgCondition";
+            case NONE -> Component.translatable("gui.create_headsupdisplay.translation.mode_off");
+            case EXPRESSION -> Component.translatable("gui.create_headsupdisplay.translation.mode_expression");
+            case CONDITIONAL -> Component.translatable("gui.create_headsupdisplay.translation.mode_conditional");
+            case IMAGE_CONDITIONAL -> Component.translatable("gui.create_headsupdisplay.translation.mode_image_conditional");
         };
     }
 
@@ -236,11 +243,13 @@ public class TranslationScreen extends Screen {
             g.drawString(font, "y = f(x) :", width / 2 - 100, 35, 0xFFFFFF);
         }
         if (config.getMode() == TranslationConfig.Mode.CONDITIONAL && !availableSourceNames.isEmpty()) {
-            String hint = "Refs: " + String.join(", ", availableSourceNames);
+            String hint = Component.translatable("gui.create_headsupdisplay.translation.refs_hint",
+                    String.join(", ", availableSourceNames)).getString();
             g.drawString(font, hint, width / 2 - 100, 35, 0xAAAAAA);
         }
         if (config.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL && !availableImageNames.isEmpty()) {
-            String hint = "Images: " + String.join(", ", availableImageNames);
+            String hint = Component.translatable("gui.create_headsupdisplay.translation.images_hint",
+                    String.join(", ", availableImageNames)).getString();
             g.drawString(font, hint, width / 2 - 100, 35, 0xAAAAAA);
         }
     }
@@ -257,7 +266,7 @@ public class TranslationScreen extends Screen {
         private final java.util.function.Consumer<String> callback;
 
         ImageSelectScreen(List<String> images, String current, java.util.function.Consumer<String> callback) {
-            super(Component.literal("Select Image"));
+            super(Component.translatable("gui.create_headsupdisplay.translation.select_image"));
             this.images = images;
             this.current = current != null ? current : "";
             this.callback = callback;

@@ -26,9 +26,11 @@ public class HelpScreen extends Screen {
         super.render(g, mx, my, pt);
         g.drawCenteredString(font, title, width / 2, 12, 0xFFFFFF);
         int y = 36;
-        for (int i = 1; i <= 9; i++) {
+        for (int i = 1; i <= 15; i++) {
             String key = "gui.create_headsupdisplay.help.line" + i;
-            g.drawString(font, Component.translatable(key).getString(), 20, y, 0xCCCCCC);
+            String text = Component.translatable(key).getString();
+            if (text.equals(key)) continue; // skip missing keys
+            g.drawString(font, text, 20, y, 0xCCCCCC);
             y += 14;
         }
     }

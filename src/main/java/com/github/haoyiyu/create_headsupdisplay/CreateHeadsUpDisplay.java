@@ -95,6 +95,18 @@ public class CreateHeadsUpDisplay {
                 event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.hold_shift",
                         Component.keybind("key.sneak")));
             }
+        } else if (stack.is(ModItems.DISPLAY_TERMINAL_ITEM.get())) {
+            if (isShiftHeld) {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.display_terminal.line1"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.display_terminal.line2"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.display_terminal.line3"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.display_terminal.line4"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.display_terminal.line5"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.display_terminal.line6"));
+            } else {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.hold_shift",
+                        Component.keybind("key.sneak")));
+            }
         } else if (stack.is(ModItems.RADAR_PLUGIN.get())) {
             if (isShiftHeld) {
                 event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.radar_plugin.line1"));

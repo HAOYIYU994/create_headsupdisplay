@@ -271,6 +271,14 @@ public class OmniCoreBlockEntity extends BlockEntity {
         }
     }
 
+    /** 按名称查找源索引，找不到返回 -1 */
+    public int findSourceIndexByName(String name) {
+        for (int i = 0; i < sources.size(); i++) {
+            if (sources.get(i).name.equals(name)) return i;
+        }
+        return -1;
+    }
+
     private void removeFromTerminal(int sourceIndex) {
         for (BlockPos tp : boundTerminals) {
             BlockEntity be = level.getBlockEntity(tp);
