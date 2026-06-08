@@ -2,8 +2,10 @@ package com.github.haoyiyu.create_headsupdisplay.client;
 
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
 import com.github.haoyiyu.create_headsupdisplay.client.render.DisplayBlockRenderer;
+import com.github.haoyiyu.create_headsupdisplay.infrastructure.ponder.HudPonderPlugin;
 import com.github.haoyiyu.create_headsupdisplay.registration.ModBlockEntities;
 import dev.engine_room.flywheel.lib.model.baked.PartialModel;
+import net.createmod.ponder.foundation.PonderIndex;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -15,7 +17,9 @@ public class HeadMountDisplayClient {
             ResourceLocation.fromNamespaceAndPath(CreateHeadsUpDisplay.MOD_ID, "item/head_mount_display")
     );
 
-    public static void init() {}
+    public static void init() {
+        PonderIndex.addPlugin(new HudPonderPlugin());
+    }
 
     @EventBusSubscriber(modid = CreateHeadsUpDisplay.MOD_ID, value = Dist.CLIENT, bus = EventBusSubscriber.Bus.MOD)
     public static class ModClientEvents {

@@ -2,8 +2,10 @@ package com.github.haoyiyu.create_headsupdisplay.block;
 
 import com.github.haoyiyu.create_headsupdisplay.item.LinkBlockItem;
 import com.github.haoyiyu.create_headsupdisplay.registration.ModBlockEntities;
+import com.github.haoyiyu.create_headsupdisplay.registration.ModBlocks;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
@@ -54,5 +56,26 @@ public class DisplayTerminalBlock extends BaseEntityBlock {
         }
         // 其他物品：走默认 useWithoutItem 逻辑
         return net.minecraft.world.ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+    }
+
+    @Override
+    protected void onPlace(BlockState state, Level level, BlockPos pos, BlockState oldState, boolean moved) {
+        super.onPlace(state, level, pos, oldState, moved);
+        if (!level.isClientSide) {
+            tryAutoBindToOmniCore(level, pos);
+        }
+    }
+
+    /** 放置终端时自动检测相邻位置是否有 OmniCore，有则直接绑定 */
+    private void tryAutoBindToOmniCore(Level level, BlockPos terminalPos) {
+        for (Direction dir : Direction.values()) {
+            BlockPos neighbor = terminalPos.relative(dir);
+            if (level.getBlockState(neighbor).is(ModBlocks.OMNI_CORE.get())) {
+                BlockEntity be = level.getBlockEntity(neighbor);
+                if (be instanceof OmniCoreBlockEntity core) {
+                    core.setBoundTerminal(terminalPos);
+                }
+            }
+        }
     }
 }

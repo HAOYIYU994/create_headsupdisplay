@@ -94,5 +94,22 @@
   "gui.create_headsupdisplay.unsupported_plugin": "[Unsupported] Missing Plugin",
   "gui.create_headsupdisplay.rename": "Rename",
   "gui.create_headsupdisplay.radar_display": "Radar Display",
-  "gui.create_headsupdisplay.all_terminals": "→ All"
+  "gui.create_headsupdisplay.all_terminals": "→ All",
+
+  "create_headsupdisplay.ponder.omni_core.header": "Data Integration Core",
+  "create_headsupdisplay.ponder.omni_core.text_1": "This is the Data Integration Core, a unified receiver for the display network",
+  "create_headsupdisplay.ponder.omni_core.text_2": "Use a Display Link as an example to establish a connection with the Core",
+  "create_headsupdisplay.ponder.omni_core.text_3": "Place a Display Terminal",
+  "create_headsupdisplay.ponder.omni_core.text_4": "Establish a connection using a similar method to the Display Link",
+  "create_headsupdisplay.ponder.omni_core.text_5": "You can also establish a connection by placing them adjacent",
+  "create_headsupdisplay.ponder.omni_core.text_6": "Right-click to open the core interface, select a display, then click Send on the data",
+  "create_headsupdisplay.ponder.omni_core.text_7": "The terminal can now receive this information and display it",
+  "create_headsupdisplay.ponder.omni_core.text_8": "For more info, check the core's help screen",
+
+  "create_headsupdisplay.ponder.display_terminal.header": "Display Terminal",
+  "create_headsupdisplay.ponder.display_terminal.text_1": "In the display network, the Display Terminal converts data into images",
+  "create_headsupdisplay.ponder.display_terminal.text_2": "But it won't render images on its own",
+  "create_headsupdisplay.ponder.display_terminal.text_3": "Attach a Display block next to the terminal to render images",
+  "create_headsupdisplay.ponder.display_terminal.text_4": "Equip the Head Mount Display to render images on your screen",
+  "create_headsupdisplay.ponder.display_terminal.text_5": "However, since the Head Mount Display and Display blocks differ in size, it's not recommended to bind both to the same terminal"
 }

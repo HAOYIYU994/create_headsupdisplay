@@ -94,5 +94,22 @@
   "gui.create_headsupdisplay.unsupported_plugin": "[不支持] 缺少插件",
   "gui.create_headsupdisplay.rename": "重命名",
   "gui.create_headsupdisplay.radar_display": "雷达显示",
-  "gui.create_headsupdisplay.all_terminals": "→ 全部"
+  "gui.create_headsupdisplay.all_terminals": "→ 全部",
+
+  "create_headsupdisplay.ponder.omni_core.header": "显示器网络的基本链接",
+  "create_headsupdisplay.ponder.omni_core.text_1": "这是数据集成核心，在显示器网络中作为信息的统一接收器",
+  "create_headsupdisplay.ponder.omni_core.text_2": "以显示连接器为例，与核心建立连接",
+  "create_headsupdisplay.ponder.omni_core.text_3": "放下一个显示核心",
+  "create_headsupdisplay.ponder.omni_core.text_4": "使用和显示连接器类似的方法建立连接",
+  "create_headsupdisplay.ponder.omni_core.text_5": "让两者紧贴也可以直接建立连接",
+  "create_headsupdisplay.ponder.omni_core.text_6": "右键打开核心界面，选择显示器然后对数据点击发送",
+  "create_headsupdisplay.ponder.omni_core.text_7": "终端就可以接受这一条信息并让它可以被显示",
+  "create_headsupdisplay.ponder.omni_core.text_8": "更多信息请查看核心的帮助界面",
+
+  "create_headsupdisplay.ponder.display_terminal.header": "显示终端",
+  "create_headsupdisplay.ponder.display_terminal.text_1": "在显示器网络中，显示终端负责将数据转化为图像",
+  "create_headsupdisplay.ponder.display_terminal.text_2": "但它不会主动渲染图像",
+  "create_headsupdisplay.ponder.display_terminal.text_3": "紧贴显示终端安装一台显示器以渲染图像",
+  "create_headsupdisplay.ponder.display_terminal.text_4": "将头戴显示器装备到头上以在你的屏幕上渲染图像",
+  "create_headsupdisplay.ponder.display_terminal.text_5": "不过由于头戴显示器和显示器方块的大小一般不同，不建议将两者绑定到同一台终端"
 }
