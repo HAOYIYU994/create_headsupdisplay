@@ -224,7 +224,7 @@ public class ClientHudData {
                     images.add(new ImageRenderData(id, bytes, tag.getString("FileName"),
                             tag.getInt("PosX"), tag.getInt("PosY"), tag.getFloat("Scale"),
                             tag.getFloat("Rotation"), tag.getInt("Alpha")));
-                    DynamicTextureCache.getOrCreate(id, bytes);
+                    DynamicTextureCache.ensureUpdated(id, bytes);
                 }
             }
             if (data.contains("radarCount")) {

@@ -9,6 +9,7 @@ import net.neoforged.api.distmarker.OnlyIn;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
@@ -21,6 +22,7 @@ import java.util.UUID;
 public class DynamicTextureCache {
     private static final Map<UUID, ResourceLocation> CACHE = new HashMap<>();
     private static final Map<UUID, int[]> SIZE_CACHE = new HashMap<>(); // [width, height]
+    private static final Map<UUID, Integer> HASH_CACHE = new HashMap<>(); // 用于检测数据变化
     private static int maxBytes() { return com.github.haoyiyu.create_headsupdisplay.config.ModConfig.IMAGE_MAX_SIZE_KB.get() * 1024; }
 
     /**
@@ -73,6 +75,22 @@ public class DynamicTextureCache {
         } catch (IOException e) { return CACHE.get(imageId); }
     }
 
+    /** 仅在数据变化时更新纹理（由数据到达时调用，避免每帧重复上传） */
+    public static void ensureUpdated(UUID imageId, byte[] pngBytes) {
+        if (pngBytes == null || pngBytes.length > maxBytes()) return;
+        int newHash = Arrays.hashCode(pngBytes);
+        Integer oldHash = HASH_CACHE.get(imageId);
+        if (oldHash != null && oldHash == newHash) return; // 未变化，跳过
+        HASH_CACHE.put(imageId, newHash);
+        // 释放旧纹理并重建，保证 GPU 上不留残留
+        if (CACHE.containsKey(imageId)) {
+            Minecraft.getInstance().getTextureManager().release(CACHE.get(imageId));
+            CACHE.remove(imageId);
+        }
+        SIZE_CACHE.remove(imageId);
+        getOrCreate(imageId, pngBytes);
+    }
+
     /** 获取已缓存纹理的宽度，-1 表示未缓存 */
     public static int getWidth(UUID imageId) {
         int[] size = SIZE_CACHE.get(imageId);
@@ -89,6 +107,7 @@ public class DynamicTextureCache {
     public static void remove(UUID imageId) {
         ResourceLocation loc = CACHE.remove(imageId);
         SIZE_CACHE.remove(imageId);
+        HASH_CACHE.remove(imageId);
         if (loc != null) {
             Minecraft.getInstance().getTextureManager().release(loc);
         }
@@ -102,5 +121,6 @@ public class DynamicTextureCache {
         }
         CACHE.clear();
         SIZE_CACHE.clear();
+        HASH_CACHE.clear();
     }
 }

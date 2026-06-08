@@ -24,8 +24,10 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 public class OmniCoreBlockEntity extends BlockEntity {
@@ -277,6 +279,9 @@ public class OmniCoreBlockEntity extends BlockEntity {
                     RedstoneSource src = sources.get(sourceIndex);
                     if (src.sourceType == RedstoneSource.Type.IMAGE && src.imageId != null) {
                         terminal.removeImageSlot(src.imageId);
+                    } else if (src.translation != null && src.translation.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL) {
+                        UUID slotId = UUID.nameUUIDFromBytes(("img_cond_" + src.name).getBytes());
+                        terminal.removeImageSlot(slotId);
                     } else {
                         BlockPos virtualPos = sentSources.get(sourceIndex);
                         if (virtualPos != null) {
@@ -505,6 +510,38 @@ public class OmniCoreBlockEntity extends BlockEntity {
             return;
         }
 
+        // REDSTONE + IMAGE_CONDITIONAL：条件匹配后推送图片槽位
+        if (src.sourceType == RedstoneSource.Type.REDSTONE && src.translation != null
+                && src.translation.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL) {
+            String imgName = src.translation.getSelectedImage(getCurrentStrength(src));
+            if (imgName != null && !imgName.isEmpty()) {
+                RedstoneSource imgSrc = findImageSourceByName(imgName);
+                if (imgSrc != null) {
+                    UUID slotId = UUID.nameUUIDFromBytes(("img_cond_" + src.name).getBytes());
+                    for (BlockPos tp : targets) {
+                        BlockEntity be = level.getBlockEntity(tp);
+                        if (be instanceof DisplayTerminalBlockEntity terminal) {
+                            terminal.updateImageData(slotId, imgSrc.imageFileName, imgSrc.imageData);
+                        }
+                    }
+                    sentSources.put(sourceIndex, new BlockPos(0, slotId.hashCode(), 0));
+                    setChanged();
+                    return;
+                }
+            }
+            // 没有选中图片 → 清理旧槽位
+            UUID slotId = UUID.nameUUIDFromBytes(("img_cond_" + src.name).getBytes());
+            for (BlockPos tp : targets) {
+                BlockEntity be = level.getBlockEntity(tp);
+                if (be instanceof DisplayTerminalBlockEntity terminal) {
+                    terminal.removeImageSlot(slotId);
+                }
+            }
+            sentSources.remove(sourceIndex);
+            setChanged();
+            return;
+        }
+
         BlockPos virtualPos = new BlockPos(0, 0, Math.abs(src.name.hashCode()));
 
         String displayText = src.displayLinkText != null ? src.displayLinkText : getDisplayText(src);
@@ -548,14 +585,60 @@ public class OmniCoreBlockEntity extends BlockEntity {
         return RedstoneSignalHelper.getSignalStrength(level, src.frequencyItem1, src.frequencyItem2);
     }
 
-    /** 获取源的显示文本（应用转译后） */
+    /** 获取源的显示文本（应用转译后），入口方法 */
     private String getDisplayText(RedstoneSource src) {
+        return getDisplayText(src, new HashSet<>());
+    }
+
+    /** 获取源的显示文本，携带已访问集合防止循环引用 */
+    private String getDisplayText(RedstoneSource src, Set<String> visited) {
         int raw = getCurrentStrength(src);
+        visited.add(src.name);
         if (src.translation != null && src.translation.getMode() != TranslationConfig.Mode.NONE) {
+            if (src.translation.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL) {
+                return "[IMAGE]";
+            }
             String t = src.translation.getDisplay(raw);
-            if (t != null) return t;
+            if (t != null) {
+                if (TranslationConfig.hasReferences(t)) {
+                    t = TranslationConfig.resolveReferences(t, refName -> resolveRefValue(refName, visited));
+                }
+                return t;
+            }
         }
         return String.valueOf(raw);
+    }
+
+    /**
+     * 按名称解析引用：在 sources 列表中查找同名源，返回其显示值。
+     * RADAR 返回 "[RADAR]"，循环引用返回原始值，名称不存在保留 \${name} 原样。
+     */
+    private String resolveRefValue(String name, Set<String> visited) {
+        for (RedstoneSource s : sources) {
+            if (name.equals(s.name)) {
+                if (s.sourceType == RedstoneSource.Type.RADAR) return "[RADAR]";
+                if (visited.contains(name)) {
+                    return String.valueOf(getCurrentStrength(s));
+                }
+                return switch (s.sourceType) {
+                    case REDSTONE -> getDisplayText(s, new HashSet<>(visited));
+                    case DISPLAY_LINK -> s.displayLinkText != null ? s.displayLinkText : "0";
+                    case IMAGE -> s.imageFileName != null ? s.imageFileName : "[IMAGE]";
+                    default -> String.valueOf(getCurrentStrength(s));
+                };
+            }
+        }
+        return "${" + name + "}";
+    }
+
+    /** 按名称查找 IMAGE 类型源 */
+    private RedstoneSource findImageSourceByName(String name) {
+        for (RedstoneSource s : sources) {
+            if (s.sourceType == RedstoneSource.Type.IMAGE && name.equals(s.name)) {
+                return s;
+            }
+        }
+        return null;
     }
 
     // 每 tick 执行，实时更新已发送槽位的数据；强度变化时自动置顶
@@ -598,6 +681,36 @@ public class OmniCoreBlockEntity extends BlockEntity {
                 continue;
             }
             RedstoneSource src = be.sources.get(idx);
+            // IMAGE_CONDITIONAL 源：每 tick 确保图片槽位数据正确，图片名变化时同步 HMD
+            if (src.sourceType == RedstoneSource.Type.REDSTONE && src.translation != null
+                    && src.translation.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL) {
+                String imgName = src.translation.getSelectedImage(be.getCurrentStrength(src));
+                boolean changed = !java.util.Objects.equals(imgName, src.lastImageName);
+                if (changed) src.lastImageName = imgName;
+                for (BlockPos tp : be.boundTerminals) {
+                    BlockEntity terminalBe = level.getBlockEntity(tp);
+                    if (terminalBe instanceof DisplayTerminalBlockEntity terminal) {
+                        UUID slotId = UUID.nameUUIDFromBytes(("img_cond_" + src.name).getBytes());
+                        if (imgName != null && !imgName.isEmpty()) {
+                            RedstoneSource imgSrc = be.findImageSourceByName(imgName);
+                            if (imgSrc != null) {
+                                var existing = terminal.getImageSlot(slotId);
+                                if (existing != null) {
+                                    existing.setFileName(imgSrc.imageFileName);
+                                    existing.setImageData(imgSrc.imageData);
+                                    terminal.setChanged();
+                                } else {
+                                    terminal.addImageSlot(slotId, imgSrc.imageFileName, imgSrc.imageData);
+                                }
+                                if (changed) terminal.syncToBoundPlayers();
+                            }
+                        } else if (changed && terminal.getImageSlot(slotId) != null) {
+                            terminal.removeImageSlot(slotId);
+                        }
+                    }
+                }
+                continue;
+            }
             String newText = null;
             if (src.sourceType == RedstoneSource.Type.DISPLAY_LINK) {
                 newText = src.displayLinkText;
@@ -808,6 +921,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
         ItemStack frequencyItem2;
         int lastStrength = -1;
         String lastSentText;
+        String lastImageName; // IMAGE_CONDITIONAL 模式：上次选中的图片源名称
         BlockPos displayLinkSourcePos;
         String displayLinkText;
         TranslationConfig translation;

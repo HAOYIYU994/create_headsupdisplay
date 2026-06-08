@@ -7,17 +7,22 @@ import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
+import java.util.List;
 import java.util.function.Consumer;
 
 public class TranslationScreen extends Screen {
     private final Consumer<TranslationConfig> onSave;
     private TranslationConfig config;
     private EditBox exprInput;
+    private final List<String> availableSourceNames;
+    private final List<String> availableImageNames;
 
-    public TranslationScreen(TranslationConfig current, Consumer<TranslationConfig> onSave) {
+    public TranslationScreen(TranslationConfig current, Consumer<TranslationConfig> onSave, List<String> availableSourceNames, List<String> availableImageNames) {
         super(Component.translatable("gui.create_headsupdisplay.translation.title"));
         this.config = current != null ? current : new TranslationConfig();
         this.onSave = onSave;
+        this.availableSourceNames = availableSourceNames != null ? availableSourceNames : List.of();
+        this.availableImageNames = availableImageNames != null ? availableImageNames : List.of();
     }
 
     @Override
@@ -26,8 +31,8 @@ public class TranslationScreen extends Screen {
         int cx = width / 2 - 100;
 
         addRenderableWidget(Button.builder(Component.literal(modeLabel()), b -> {
-            config.setMode(TranslationConfig.Mode.values()[(config.getMode().ordinal() + 1) % 3]);
-            if (config.getMode() == TranslationConfig.Mode.CONDITIONAL) ensureRules();
+            config.setMode(TranslationConfig.Mode.values()[(config.getMode().ordinal() + 1) % 4]);
+            if (config.getMode() == TranslationConfig.Mode.CONDITIONAL || config.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL) ensureRules();
             rebuild();
         }).bounds(cx, 10, 200, 20).build());
 
@@ -38,7 +43,7 @@ public class TranslationScreen extends Screen {
             addRenderableWidget(exprInput);
         }
 
-        if (config.getMode() == TranslationConfig.Mode.CONDITIONAL) {
+        if (config.getMode() == TranslationConfig.Mode.CONDITIONAL || config.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL) {
             ensureRules();
             rebuildConditionRows();
         }
@@ -69,7 +74,7 @@ public class TranslationScreen extends Screen {
             exprInput.setMaxLength(64); exprInput.setValue(config.getExpression());
             addRenderableWidget(exprInput);
         }
-        if (config.getMode() == TranslationConfig.Mode.CONDITIONAL) {
+        if (config.getMode() == TranslationConfig.Mode.CONDITIONAL || config.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL) {
             ensureRules();
             rebuildConditionRows();
         }
@@ -80,7 +85,8 @@ public class TranslationScreen extends Screen {
 
     private static class CondRow {
         EditBox valBox, outBox;
-        Button opBtn, delBtn;
+        Button opBtn, delBtn, imgBtn;
+        int ruleIndex;
     }
 
     private void clearCondWidgets() {
@@ -89,6 +95,7 @@ public class TranslationScreen extends Screen {
             if (row.valBox != null) removeWidget(row.valBox);
             if (row.outBox != null) removeWidget(row.outBox);
             if (row.delBtn != null) removeWidget(row.delBtn);
+            if (row.imgBtn != null) removeWidget(row.imgBtn);
         }
         condRows.clear();
         if (addElseIfBtn != null) { removeWidget(addElseIfBtn); addElseIfBtn = null; }
@@ -98,6 +105,7 @@ public class TranslationScreen extends Screen {
         clearCondWidgets();
         var rules = config.getRules();
         int cx = width / 2 - 130;
+        boolean isImageMode = config.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL;
         // 最后一行是 else 输出
         int last = rules.size() - 1;
 
@@ -106,13 +114,22 @@ public class TranslationScreen extends Screen {
             var rule = rules.get(i);
             boolean isElse = (i == last);
             CondRow row = new CondRow();
+            row.ruleIndex = i;
 
             if (isElse) {
                 row.opBtn = addRenderableWidget(Button.builder(Component.literal((i == 0) ? "Else" : "Else"), b -> {})
                         .bounds(cx, y, 80, 20).build());
-                row.outBox = new EditBox(font, cx + 85, y, 150, 20, Component.literal("out"));
-                row.outBox.setMaxLength(32); row.outBox.setValue(rule.output);
-                addRenderableWidget(row.outBox);
+                if (isImageMode) {
+                    final int ri = i;
+                    row.imgBtn = addRenderableWidget(Button.builder(
+                            Component.literal(rule.imageName.isEmpty() ? "[pick]" : rule.imageName), b ->
+                                openImagePicker(ri)
+                            ).bounds(cx + 85, y, 150, 20).build());
+                } else {
+                    row.outBox = new EditBox(font, cx + 85, y, 150, 20, Component.literal("out"));
+                    row.outBox.setMaxLength(32); row.outBox.setValue(rule.output);
+                    addRenderableWidget(row.outBox);
+                }
             } else {
                 String label = (i == 0) ? "If" : "ElsIf";
                 final int idx = i;
@@ -125,9 +142,17 @@ public class TranslationScreen extends Screen {
                 row.valBox.setMaxLength(6); row.valBox.setValue(String.valueOf(rule.compareValue));
                 addRenderableWidget(row.valBox);
 
-                row.outBox = new EditBox(font, cx + 130, y, 100, 20, Component.literal("out"));
-                row.outBox.setMaxLength(32); row.outBox.setValue(rule.output);
-                addRenderableWidget(row.outBox);
+                if (isImageMode) {
+                    final int ri = i;
+                    row.imgBtn = addRenderableWidget(Button.builder(
+                            Component.literal(rule.imageName.isEmpty() ? "[pick]" : rule.imageName), b ->
+                                openImagePicker(ri)
+                            ).bounds(cx + 130, y, 100, 20).build());
+                } else {
+                    row.outBox = new EditBox(font, cx + 130, y, 100, 20, Component.literal("out"));
+                    row.outBox.setMaxLength(32); row.outBox.setValue(rule.output);
+                    addRenderableWidget(row.outBox);
+                }
 
                 if (rules.size() > 2) {
                     row.delBtn = addRenderableWidget(Button.builder(Component.literal("X"), b -> {
@@ -150,12 +175,28 @@ public class TranslationScreen extends Screen {
         }
     }
 
+    private void openImagePicker(int ruleIndex) {
+        collectRowData();
+        var rules = config.getRules();
+        if (ruleIndex < 0 || ruleIndex >= rules.size()) return;
+        minecraft.setScreen(new ImageSelectScreen(
+            availableImageNames,
+            rules.get(ruleIndex).imageName,
+            selected -> {
+                rules.get(ruleIndex).imageName = selected;
+                minecraft.setScreen(this);
+                rebuildConditionRows();
+            }
+        ));
+    }
+
     private void collectRowData() {
         var rules = config.getRules();
+        boolean isImageMode = config.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL;
         for (int i = 0; i < condRows.size() && i < rules.size(); i++) {
             var row = condRows.get(i);
             var rule = rules.get(i);
-            if (rule != null && row.outBox != null) rule.output = row.outBox.getValue();
+            if (rule != null && row.outBox != null && !isImageMode) rule.output = row.outBox.getValue();
             if (rule != null && row.valBox != null) {
                 try { rule.compareValue = Integer.parseInt(row.valBox.getValue()); } catch (NumberFormatException ignored) {}
             }
@@ -166,7 +207,7 @@ public class TranslationScreen extends Screen {
         if (config.getMode() == TranslationConfig.Mode.EXPRESSION && exprInput != null) {
             config.setExpression(exprInput.getValue());
         }
-        if (config.getMode() == TranslationConfig.Mode.CONDITIONAL) {
+        if (config.getMode() == TranslationConfig.Mode.CONDITIONAL || config.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL) {
             collectRowData();
         }
     }
@@ -176,6 +217,7 @@ public class TranslationScreen extends Screen {
             case NONE -> "Mode: Off";
             case EXPRESSION -> "Mode: Expression";
             case CONDITIONAL -> "Mode: Conditional";
+            case IMAGE_CONDITIONAL -> "Mode: ImgCondition";
         };
     }
 
@@ -193,10 +235,66 @@ public class TranslationScreen extends Screen {
         if (config.getMode() == TranslationConfig.Mode.EXPRESSION) {
             g.drawString(font, "y = f(x) :", width / 2 - 100, 35, 0xFFFFFF);
         }
+        if (config.getMode() == TranslationConfig.Mode.CONDITIONAL && !availableSourceNames.isEmpty()) {
+            String hint = "Refs: " + String.join(", ", availableSourceNames);
+            g.drawString(font, hint, width / 2 - 100, 35, 0xAAAAAA);
+        }
+        if (config.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL && !availableImageNames.isEmpty()) {
+            String hint = "Images: " + String.join(", ", availableImageNames);
+            g.drawString(font, hint, width / 2 - 100, 35, 0xAAAAAA);
+        }
     }
 
     @Override
     public void onClose() { saveCurrent(); super.onClose(); }
     @Override
     public boolean isPauseScreen() { return false; }
+
+    // ===== 图片选择弹窗 =====
+    private static class ImageSelectScreen extends Screen {
+        private final List<String> images;
+        private final String current;
+        private final java.util.function.Consumer<String> callback;
+
+        ImageSelectScreen(List<String> images, String current, java.util.function.Consumer<String> callback) {
+            super(Component.literal("Select Image"));
+            this.images = images;
+            this.current = current != null ? current : "";
+            this.callback = callback;
+        }
+
+        @Override
+        protected void init() {
+            int cx = width / 2 - 100;
+            int y = 30;
+            // "None" 选项
+            addRenderableWidget(Button.builder(
+                    Component.literal(current.isEmpty() ? "> [None] <" : "  [None]"),
+                    b -> callback.accept("")
+            ).bounds(cx, y, 200, 20).build());
+            // 各图片选项
+            for (int i = 0; i < images.size(); i++) {
+                y += 22;
+                final String name = images.get(i);
+                boolean sel = name.equals(current);
+                addRenderableWidget(Button.builder(
+                        Component.literal(sel ? ("> " + name + " <") : ("  " + name)),
+                        b -> callback.accept(name)
+                ).bounds(cx, y, 200, 20).build());
+            }
+            y += 30;
+            addRenderableWidget(Button.builder(Component.translatable("gui.cancel"),
+                    b -> callback.accept(current) // 取消，保持原值
+            ).bounds(cx, y, 200, 20).build());
+        }
+
+        @Override
+        public void render(GuiGraphics g, int mx, int my, float pt) {
+            renderBackground(g, mx, my, pt);
+            super.render(g, mx, my, pt);
+        }
+
+        @Override
+        public boolean isPauseScreen() { return false; }
+    }
 }

@@ -3,12 +3,15 @@ package com.github.haoyiyu.create_headsupdisplay.config;
 import net.minecraft.nbt.CompoundTag;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * 转译配置：支持表达式型和条件型两种模式。
+ * 转译配置：支持无转译、表达式型、条件型、图片逻辑型四种模式。
  */
 public class TranslationConfig {
-    public enum Mode { NONE, EXPRESSION, CONDITIONAL }
+    public enum Mode { NONE, EXPRESSION, CONDITIONAL, IMAGE_CONDITIONAL }
 
     private Mode mode = Mode.NONE;
     private String expression = "";  // 表达式型：如 "3*x+6"
@@ -20,9 +23,11 @@ public class TranslationConfig {
         public Op op = Op.EQUAL;
         public int compareValue;
         public String output = "";
+        public String imageName = ""; // IMAGE_CONDITIONAL 模式专用
 
         public ConditionalRule() {}
         public ConditionalRule(Op op, int val, String out) { this.op = op; this.compareValue = val; this.output = out; }
+        public ConditionalRule(Op op, int val, String out, String imgName) { this.op = op; this.compareValue = val; this.output = out; this.imageName = imgName; }
     }
 
     public TranslationConfig() {}
@@ -49,6 +54,45 @@ public class TranslationConfig {
             }
         }
         return null;
+    }
+
+    /** 图片逻辑型：根据输入值返回选中图片的源名称。null 表示未匹配。 */
+    public String getSelectedImage(int input) {
+        if (mode == Mode.IMAGE_CONDITIONAL && !rules.isEmpty()) {
+            int last = rules.size() - 1;
+            for (int i = 0; i < rules.size(); i++) {
+                ConditionalRule rule = rules.get(i);
+                if (i == last || checkCondition(input, rule)) {
+                    return rule.imageName.isEmpty() ? null : rule.imageName;
+                }
+            }
+        }
+        return null;
+    }
+
+    // ===== 引用语法支持 =====
+    private static final Pattern REF_PATTERN = Pattern.compile("\\$\\{([^}]+)\\}");
+
+    /** 检查文本是否包含 \${...} 引用占位符 */
+    public static boolean hasReferences(String text) {
+        return text != null && REF_PATTERN.matcher(text).find();
+    }
+
+    /**
+     * 解析文本中的 \${名称} 引用占位符，使用 resolver 获取替换值。
+     * 名称不存在时保留原 \${名称} 不变。
+     */
+    public static String resolveReferences(String text, Function<String, String> resolver) {
+        if (text == null || text.isEmpty()) return text;
+        Matcher m = REF_PATTERN.matcher(text);
+        StringBuilder sb = new StringBuilder();
+        while (m.find()) {
+            String refName = m.group(1);
+            String replacement = resolver.apply(refName);
+            m.appendReplacement(sb, Matcher.quoteReplacement(replacement != null ? replacement : m.group(0)));
+        }
+        m.appendTail(sb);
+        return sb.toString();
     }
 
     private boolean checkCondition(int input, ConditionalRule rule) {
@@ -151,6 +195,7 @@ public class TranslationConfig {
             rt.putInt("op", r.op.ordinal());
             rt.putInt("val", r.compareValue);
             rt.putString("out", r.output);
+            if (!r.imageName.isEmpty()) rt.putString("img", r.imageName);
             rulesTag.add(rt);
         }
         tag.putInt("ruleCount", rulesTag.size());
@@ -165,7 +210,8 @@ public class TranslationConfig {
         int count = tag.getInt("ruleCount");
         for (int i = 0; i < count; i++) {
             CompoundTag rt = tag.getCompound("rule_" + i);
-            tc.rules.add(new ConditionalRule(ConditionalRule.Op.values()[rt.getInt("op")], rt.getInt("val"), rt.getString("out")));
+            tc.rules.add(new ConditionalRule(ConditionalRule.Op.values()[rt.getInt("op")], rt.getInt("val"), rt.getString("out"),
+                    rt.contains("img") ? rt.getString("img") : ""));
         }
         return tc;
     }

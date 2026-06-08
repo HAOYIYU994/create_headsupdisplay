@@ -400,11 +400,23 @@ public class OmniCoreScreen extends Screen {
                 final int idx = i;
                 SourceEntry entry = sources.get(idx);
                 TranslationConfig tc = entry.transConfig != null ? entry.transConfig : new TranslationConfig();
+                List<String> refNames = new ArrayList<>();
+                List<String> imgNames = new ArrayList<>();
+                for (int j = 0; j < sources.size(); j++) {
+                    SourceEntry se = sources.get(j);
+                    if (j != idx && !se.isRadar && se.name != null && !se.name.isEmpty()) {
+                        refNames.add(se.name);
+                    }
+                    if (se.isImage && se.name != null && !se.name.isEmpty()
+                            && se.imageData != null && se.imageData.length > 0) {
+                        imgNames.add(se.name);
+                    }
+                }
                 Minecraft.getInstance().setScreen(new TranslationScreen(tc, config -> {
                     entry.transConfig = config;
                     entry.trans = config.getMode() != TranslationConfig.Mode.NONE;
                     PacketDistributor.sendToServer(new UpdateTranslationPayload(corePos, idx, config.serialize()));
-                }));
+                }, refNames, imgNames));
                 return true;
             }
             if (mouseX >= width - 80 && mouseX <= width - 50 && mouseY >= y && mouseY <= y + 20) {
@@ -414,7 +426,11 @@ public class OmniCoreScreen extends Screen {
                     if (se.isRadar) {
                         PacketDistributor.sendToServer(new PushRadarSlotsPayload(corePos, selectedTerminal));
                     } else {
-                        PacketDistributor.sendToServer(new SendSourceToTerminalPayload(corePos, i, selectedTerminal));
+                        CompoundTag transTag = null;
+                        if (se.transConfig != null && se.transConfig.getMode() != TranslationConfig.Mode.NONE) {
+                            transTag = se.transConfig.serialize();
+                        }
+                        PacketDistributor.sendToServer(new SendSourceToTerminalPayload(corePos, i, selectedTerminal, transTag));
                     }
                 }
                 return true;

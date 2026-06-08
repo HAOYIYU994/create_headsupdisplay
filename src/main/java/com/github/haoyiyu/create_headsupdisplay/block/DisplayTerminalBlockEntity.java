@@ -369,11 +369,13 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
 
     // ========== 图片槽位管理 ==========
     public List<ImageSlot> getImageSlots() { return new ArrayList<>(imageSlots.values()); }
+    public ImageSlot getImageSlot(UUID imageId) { return imageSlots.get(imageId); }
     public void addImageSlot(UUID imageId, String fileName, byte[] imageData) {
         if (imageData == null || imageData.length > com.github.haoyiyu.create_headsupdisplay.config.ModConfig.IMAGE_MAX_SIZE_KB.get() * 1024) return;
         ImageSlot slot = new ImageSlot(imageId, fileName, imageData);
         imageSlots.put(imageId, slot);
         setChanged();
+        syncToBoundPlayers();
     }
 
     /** 只更新图片数据，保留位置/旋转/透明度等配置 */
