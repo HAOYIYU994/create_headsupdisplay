@@ -61,10 +61,11 @@ public class CreateHeadsUpDisplay {
             DisplayTarget.BY_BLOCK.register(ModBlocks.DISPLAY_TERMINAL.get(), new DisplayTerminalTarget());
             DisplayTarget.BY_BLOCK.register(ModBlocks.OMNI_CORE.get(), new OmniCoreDisplayTarget());
             // 雷达集成（软依赖，通过反射安全调用）
+            // 注意：必须用 Throwable 而非 Exception，因为 NoClassDefFoundError 是 Error 的子类
             try {
                 Class<?> radarIntegration = Class.forName("com.github.haoyiyu.create_headsupdisplay.integration.RadarIntegration");
                 radarIntegration.getMethod("init").invoke(null);
-            } catch (Exception ignored) {}
+            } catch (Throwable ignored) {}
         });
     }
 
