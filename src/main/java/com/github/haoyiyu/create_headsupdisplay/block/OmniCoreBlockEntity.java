@@ -31,6 +31,20 @@ import java.util.Set;
 import java.util.UUID;
 
 public class OmniCoreBlockEntity extends BlockEntity {
+    /** 1x1 透明 PNG，IMAGE_CONDITIONAL 无匹配时保持槽位 */
+    private static final byte[] BLANK_PNG;
+    static {
+        byte[] b = null;
+        try {
+            var img = new java.awt.image.BufferedImage(1, 1, java.awt.image.BufferedImage.TYPE_INT_ARGB);
+            img.setRGB(0, 0, 0);
+            var bos = new java.io.ByteArrayOutputStream();
+            javax.imageio.ImageIO.write(img, "png", bos);
+            b = bos.toByteArray();
+        } catch (Throwable ignored) {}
+        BLANK_PNG = b != null && b.length > 0 ? b : new byte[0];
+    }
+
     private boolean autoSortEnabled = true;
     private List<BlockPos> boundTerminals = new ArrayList<>();
     private Map<BlockPos, String> terminalNames = new HashMap<>();
@@ -537,15 +551,15 @@ public class OmniCoreBlockEntity extends BlockEntity {
                     return;
                 }
             }
-            // 没有选中图片 → 清理旧槽位
+            // 没有选中图片 → 发送透明图片保持槽位
             UUID slotId = UUID.nameUUIDFromBytes(("img_cond_" + src.name).getBytes());
             for (BlockPos tp : targets) {
                 BlockEntity be = level.getBlockEntity(tp);
                 if (be instanceof DisplayTerminalBlockEntity terminal) {
-                    terminal.removeImageSlot(slotId);
+                    terminal.updateImageData(slotId, "", BLANK_PNG);
                 }
             }
-            sentSources.remove(sourceIndex);
+            sentSources.put(sourceIndex, new BlockPos(0, slotId.hashCode(), 0));
             setChanged();
             return;
         }
@@ -708,12 +722,15 @@ public class OmniCoreBlockEntity extends BlockEntity {
                                     existing.setImageData(imgSrc.imageData);
                                     terminal.setChanged();
                                 } else {
-                                    terminal.addImageSlot(slotId, imgSrc.imageFileName, imgSrc.imageData);
+                                    // 图片槽位被用户手动删除，从 sentSources 中移除以停止跟踪
+                                    be.sentSources.remove(idx);
+                                    be.setChanged();
                                 }
                                 if (changed) terminal.syncToBoundPlayers();
                             }
-                        } else if (changed && terminal.getImageSlot(slotId) != null) {
-                            terminal.removeImageSlot(slotId);
+                        } else if (changed) {
+                            // 没有选中图片 → 更新为透明图片保持槽位不变
+                            terminal.updateImageData(slotId, "", BLANK_PNG);
                         }
                     }
                 }
