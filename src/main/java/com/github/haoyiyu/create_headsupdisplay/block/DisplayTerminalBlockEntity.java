@@ -57,6 +57,17 @@ public class DisplayTerminalBlockEntity extends BlockEntity {
         return slots.get(sourcePos);
     }
 
+    /** 按数据源名称查找槽位，用于跨同步识别同一数据源 */
+    public DisplaySlot getSlotBySourceName(String name) {
+        if (name == null) return null;
+        for (DisplaySlot slot : slots.values()) {
+            if (name.equals(slot.getSourceName())) {
+                return slot;
+            }
+        }
+        return null;
+    }
+
     public void updateSlotData(BlockPos sourcePos, String text) {
         updateSlotData(sourcePos, text, true);
     }

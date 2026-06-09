@@ -567,19 +567,23 @@ public class OmniCoreBlockEntity extends BlockEntity {
         BlockPos virtualPos = new BlockPos(0, 0, Math.abs(src.name.hashCode()));
 
         String displayText = src.displayLinkText != null ? src.displayLinkText : getDisplayText(src);
+        String cleanName = src.name.replaceAll("§[0-9a-fk-or]", "");
 
         for (BlockPos tp : targets) {
             BlockEntity be = level.getBlockEntity(tp);
             if (!(be instanceof DisplayTerminalBlockEntity terminal)) continue;
 
-            boolean isNew = !sentSources.containsKey(sourceIndex);
-            if (isNew) {
-                terminal.updateSlotConfig(virtualPos,
-                        10, 50 + sentSources.size() * 20,
-                        1.0f, 0f, 0xFFFFFF, 255);
+            boolean sentBefore = sentSources.containsKey(sourceIndex);
+            if (!sentBefore) {
+                // 按名称判断终端是否已有此数据源的槽位，有则保留用户配置不被覆盖
+                if (terminal.getSlotBySourceName(cleanName) == null) {
+                    terminal.updateSlotConfig(virtualPos,
+                            10, 50 + sentSources.size() * 20,
+                            1.0f, 0f, 0xFFFFFF, 255);
+                }
             }
             terminal.updateSlotData(virtualPos, displayText);
-            terminal.updateSlotSourceName(virtualPos, src.name.replaceAll("§[0-9a-fk-or]", ""));
+            terminal.updateSlotSourceName(virtualPos, cleanName);
         }
         sentSources.put(sourceIndex, virtualPos);
         setChanged();
