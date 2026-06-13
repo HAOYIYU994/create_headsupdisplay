@@ -223,7 +223,7 @@ public class TerminalProConfigScreen extends Screen {
                 e.alpha = t.getInt("Alpha"); e.radarRange = t.getInt("RadarRange");
                 e.layerIndex = t.getInt("layerIndex");
                 radars.add(e);
-                sourceCards.add(new SourceCard("[Radar]", "Range:" + e.radarRange, BlockPos.ZERO));
+                sourceCards.add(new SourceCard(t("gui.create_headsupdisplay.pro.radar_placeholder"), "Range:" + e.radarRange, BlockPos.ZERO));
             }
         }
 
@@ -374,23 +374,23 @@ public class TerminalProConfigScreen extends Screen {
         x += 5;
 
         // 工具按钮
-        x = drawToolBtn(g, mx, my, x, y, h, "Aa", "Add Text");
+        x = drawToolBtn(g, mx, my, x, y, h, t("gui.create_headsupdisplay.pro.tool_text"), t("gui.create_headsupdisplay.pro.tool_text.tip"));
         boolean hasSelection = selectedElement != null;
         boolean isSlot = selectedElement instanceof SlotEntry;
-        String modeLabel = isSlot ? modeName(((SlotEntry)selectedElement).displayMode) : "Mode";
-        x = drawToolBtn(g, mx, my, x, y, h, modeLabel, "Display Mode", isSlot ? 0xFF446688 : 0xFF333344);
-        x = drawToolBtn(g, mx, my, x, y, h, "🎨", "Color", hasSelection ? 0xFF4444AA : 0xFF333344);
-        x = drawToolBtn(g, mx, my, x, y, h, "▶", "Animate", isSlot ? 0xFF448866 : 0xFF333344);
-        x = drawToolBtn(g, mx, my, x, y, h, "🗑", "Delete", hasSelection ? 0xFFFF4444 : 0xFF664444);
+        String modeLabel = isSlot ? modeName(((SlotEntry)selectedElement).displayMode) : t("gui.create_headsupdisplay.pro.tool_mode");
+        x = drawToolBtn(g, mx, my, x, y, h, modeLabel, t("gui.create_headsupdisplay.pro.tool_mode.tip"), isSlot ? 0xFF446688 : 0xFF333344);
+        x = drawToolBtn(g, mx, my, x, y, h, t("gui.create_headsupdisplay.pro.tool_color"), t("gui.create_headsupdisplay.pro.tool_color.tip"), hasSelection ? 0xFF4444AA : 0xFF333344);
+        x = drawToolBtn(g, mx, my, x, y, h, t("gui.create_headsupdisplay.pro.tool_anim"), t("gui.create_headsupdisplay.pro.tool_anim.tip"), isSlot ? 0xFF448866 : 0xFF333344);
+        x = drawToolBtn(g, mx, my, x, y, h, t("gui.create_headsupdisplay.pro.tool_delete"), t("gui.create_headsupdisplay.pro.tool_delete.tip"), hasSelection ? 0xFFFF4444 : 0xFF664444);
         x += 4;
         // 保存
-        x = drawToolBtn(g, mx, my, x, y, h, "💾", "Save", 0xFF228822);
+        x = drawToolBtn(g, mx, my, x, y, h, t("gui.create_headsupdisplay.pro.tool_save"), t("gui.create_headsupdisplay.pro.tool_save.tip"), 0xFF228822);
 
         // 右侧图层下拉（展开时）
         if (renameLayerMode) {
             int rx = width - 160;
             g.fill(rx - 2, 1, rx + 155, h - 1, 0xEE333344);
-            g.drawString(font, "Rename:", rx, y, 0xAAAAAA);
+            g.drawString(font, t("gui.create_headsupdisplay.pro.rename_label"), rx, y, 0xAAAAAA);
             g.drawString(font, renameLayerText + "_", rx + 46, y, 0x00FF00);
             g.fill(rx + 46, y + 12, rx + 130, y + 13, 0xFF00FF00);
             if (mx >= rx + 46 && mx <= rx + 130 && my >= y && my <= y + 14) {
@@ -451,10 +451,10 @@ public class TerminalProConfigScreen extends Screen {
 
         // 空画布提示
         if (allSlots.isEmpty() && staticTexts.isEmpty() && images.isEmpty() && radars.isEmpty()) {
-            String hint = "Drag source cards from the dock below onto this canvas";
+            String hint = t("gui.create_headsupdisplay.pro.canvas_hint1");
             int hw = font.width(hint);
             g.drawString(font, hint, (width - hw) / 2, canvasY + canvasH / 2 - 8, 0xFF8888AA);
-            String hint2 = "or use the toolbar above to add text";
+            String hint2 = t("gui.create_headsupdisplay.pro.canvas_hint2");
             int hw2 = font.width(hint2);
             g.drawString(font, hint2, (width - hw2) / 2, canvasY + canvasH / 2 + 8, 0xFF6666AA);
         }
@@ -526,7 +526,7 @@ public class TerminalProConfigScreen extends Screen {
                 g.fill(0, bh - 1, bw, bh, onCurrent ? 0xFF5050AA : 0xFF282850);
                 int accent = 0xFF000000 | (slot.color & 0xFFFFFF);
                 g.fill(0, 0, 4, bh, accent);
-                g.drawString(font, text.isEmpty() ? "[empty]" : text, 8, 4, onCurrent ? 0xFFFFFFFF : 0xFF888888);
+                g.drawString(font, text.isEmpty() ? t("gui.create_headsupdisplay.pro.empty_slot") : text, 8, 4, onCurrent ? 0xFFFFFFFF : 0xFF888888);
             } else {
                 // gauge 模式：用 GaugeRenderer 直接渲染
                 int dim = onCurrent ? 0xFF : 0x44;
@@ -642,7 +642,7 @@ public class TerminalProConfigScreen extends Screen {
             g.fill(cx - r, cy, cx + r, cy + 1, onCur ? 0xFF228822 : 0xFF114411);
             g.fill(cx, cy - r, cx + 1, cy + r, onCur ? 0xFF228822 : 0xFF114411);
             g.fill(cx - 3, cy - 3, cx + 4, cy + 4, onCur ? 0xFF00FF00 : 0xFF228822);
-            g.drawString(font, "[Radar]", 4, 4, onCur ? 0x22FF22 : 0x116611);
+            g.drawString(font, t("gui.create_headsupdisplay.pro.radar_placeholder"), 4, 4, onCur ? 0x22FF22 : 0x116611);
             g.pose().popPose();
 
             if (sel) {
@@ -726,7 +726,7 @@ public class TerminalProConfigScreen extends Screen {
         g.enableScissor(0, dockY + 1, width, dockY + dockH);
 
         if (sourceCards.isEmpty()) {
-            String hint = "No source data yet. Send data from OmniCore to see cards here.";
+            String hint = t("gui.create_headsupdisplay.pro.dock_empty");
             g.drawString(font, hint, 32, cardY + 8, 0xFF8888AA);
         }
 
@@ -742,7 +742,7 @@ public class TerminalProConfigScreen extends Screen {
                 g.drawString(font, name, cx + 4, cardY + 3, 0xFFFFFFFF);
                 String val = card.value.length() > 12 ? card.value.substring(0, 11) + "." : card.value;
                 g.drawString(font, val, cx + 4, cardY + 18, 0xFFFFFFFF);
-                String tag = card.type == 1 ? "IMG" : (card.type == 2 ? "RDR" : "SRC");
+                String tag = card.type == 1 ? t("gui.create_headsupdisplay.pro.card_img") : (card.type == 2 ? t("gui.create_headsupdisplay.pro.card_rdr") : t("gui.create_headsupdisplay.pro.card_src"));
                 g.drawString(font, tag, cx + CARD_W - font.width(tag) - 4, cardY + CARD_H - 10, 0xFFCCCCCC);
                 // 删除按钮（右上）
                 int ddx = cx + CARD_W - 14, ddy = cardY;
@@ -840,7 +840,7 @@ public class TerminalProConfigScreen extends Screen {
         int aw = font.width("Aa") + 8;
         if (mx >= x && mx <= x + aw && my >= 0 && my <= menuH) {
             playClick();
-            StaticTextEntry e = new StaticTextEntry("Text", width / 2, height / 2);
+            StaticTextEntry e = new StaticTextEntry(t("gui.create_headsupdisplay.pro.new_text"), width / 2, height / 2);
             e.layerIndex = currentLayer;
             staticTexts.add(e);
             selectedElement = e;
@@ -1503,4 +1503,6 @@ public class TerminalProConfigScreen extends Screen {
     }
 
     private boolean button(int b) { return b == 0; }
+
+    private static String t(String key) { return Component.translatable(key).getString(); }
 }
