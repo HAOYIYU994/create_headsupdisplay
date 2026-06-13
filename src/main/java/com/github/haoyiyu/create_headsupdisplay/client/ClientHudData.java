@@ -104,43 +104,44 @@ public class ClientHudData {
 
     public static class SlotRenderData {
         public final BlockPos sourcePos;
-        public final int posX, posY;
+        public final int posX, posY, layerIndex;
         public final float scale;
         public final String text;
         public final int displayLine;
+        public final int displayMode;
+        public final float displayMax, displayMin;
+        public final String displayUnit;
         public final float rotation;
-        public final int color;
-        public final int alpha;
+        public final int color, alpha;
+        public final boolean frozen;
+        public final java.util.List<com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation> animations;
 
-        public SlotRenderData(BlockPos sourcePos, int posX, int posY, float scale, String text, int displayLine, float rotation, int color, int alpha) {
-            this.sourcePos = sourcePos;
-            this.posX = posX;
-            this.posY = posY;
-            this.scale = scale;
-            this.text = text;
-            this.displayLine = displayLine;
-            this.rotation = rotation;
-            this.color = color;
-            this.alpha = alpha;
+        public SlotRenderData(BlockPos sourcePos, int posX, int posY, float scale, String text, int displayLine,
+                              int displayMode, float displayMax, float displayMin, String displayUnit,
+                              float rotation, int color, int alpha, int layerIndex, boolean frozen,
+                              java.util.List<com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation> animations) {
+            this.sourcePos = sourcePos; this.posX = posX; this.posY = posY;
+            this.scale = scale; this.text = text; this.displayLine = displayLine;
+            this.displayMode = displayMode;
+            this.displayMax = displayMax; this.displayMin = displayMin;
+            this.displayUnit = displayUnit != null ? displayUnit : "";
+            this.rotation = rotation; this.color = color; this.alpha = alpha;
+            this.layerIndex = layerIndex; this.frozen = frozen;
+            this.animations = animations != null ? animations : java.util.List.of();
         }
     }
 
     public static class StaticTextRenderData {
         public final String text;
-        public final int posX, posY;
-        public final float scale;
-        public final float rotation;
-        public final int color;
-        public final int alpha;
+        public final int posX, posY, layerIndex;
+        public final float scale, rotation;
+        public final int color, alpha;
+        public final boolean frozen;
 
-        public StaticTextRenderData(String text, int posX, int posY, float scale, float rotation, int color, int alpha) {
-            this.text = text;
-            this.posX = posX;
-            this.posY = posY;
-            this.scale = scale;
-            this.rotation = rotation;
-            this.color = color;
-            this.alpha = alpha;
+        public StaticTextRenderData(String text, int posX, int posY, float scale, float rotation, int color, int alpha, int layerIndex, boolean frozen) {
+            this.text = text; this.posX = posX; this.posY = posY;
+            this.scale = scale; this.rotation = rotation; this.color = color; this.alpha = alpha;
+            this.layerIndex = layerIndex; this.frozen = frozen;
         }
     }
 
@@ -148,37 +149,27 @@ public class ClientHudData {
         public final UUID imageId;
         public final byte[] imageData;
         public final String fileName;
-        public final int posX, posY;
-        public final float scale;
-        public final float rotation;
+        public final int posX, posY, layerIndex;
+        public final float scale, rotation;
         public final int alpha;
+        public final boolean frozen;
 
-        public ImageRenderData(UUID imageId, byte[] imageData, String fileName, int posX, int posY, float scale, float rotation, int alpha) {
-            this.imageId = imageId;
-            this.imageData = imageData;
-            this.fileName = fileName;
-            this.posX = posX;
-            this.posY = posY;
-            this.scale = scale;
-            this.rotation = rotation;
-            this.alpha = alpha;
+        public ImageRenderData(UUID imageId, byte[] imageData, String fileName, int posX, int posY, float scale, float rotation, int alpha, int layerIndex, boolean frozen) {
+            this.imageId = imageId; this.imageData = imageData; this.fileName = fileName;
+            this.posX = posX; this.posY = posY; this.scale = scale; this.rotation = rotation;
+            this.alpha = alpha; this.layerIndex = layerIndex; this.frozen = frozen;
         }
     }
 
     public static class RadarRenderData {
-        public final int posX, posY;
-        public final float scale;
-        public final float rotation;
-        public final int alpha;
-        public final int radarRange;
+        public final int posX, posY, layerIndex;
+        public final float scale, rotation;
+        public final int alpha, radarRange;
+        public final boolean frozen;
 
-        public RadarRenderData(int posX, int posY, float scale, float rotation, int alpha, int range) {
-            this.posX = posX;
-            this.posY = posY;
-            this.scale = scale;
-            this.rotation = rotation;
-            this.alpha = alpha;
-            this.radarRange = range;
+        public RadarRenderData(int posX, int posY, float scale, float rotation, int alpha, int range, int layerIndex, boolean frozen) {
+            this.posX = posX; this.posY = posY; this.scale = scale; this.rotation = rotation;
+            this.alpha = alpha; this.radarRange = range; this.layerIndex = layerIndex; this.frozen = frozen;
         }
     }
 
@@ -191,39 +182,58 @@ public class ClientHudData {
         List<RadarRenderData> radarSlots = new ArrayList<>();
 
         void update(CompoundTag data) {
-            slots.clear();
-            staticTexts.clear();
-            images.clear();
-            radarSlots.clear();
+            slots.clear(); staticTexts.clear(); images.clear(); radarSlots.clear();
+            // 解析图层冻结信息
+            java.util.Map<Integer, Boolean> frozenMap = new java.util.HashMap<>();
+            if (data.contains("layerCount")) {
+                int lc = data.getInt("layerCount");
+                for (int i = 0; i < lc; i++) {
+                    CompoundTag lt = data.getCompound("layer_" + i);
+                    if (lt != null) frozenMap.put(i, lt.getBoolean("Frozen"));
+                }
+            }
 
             if (data.contains("slotCount")) {
                 int count = data.getInt("slotCount");
                 for (int i = 0; i < count; i++) {
                     CompoundTag tag = data.getCompound("slot_" + i);
                     BlockPos sp = BlockPos.of(tag.getLong("sourcePos"));
+                    int li = tag.getInt("layerIndex");
+                    var anims = new java.util.ArrayList<com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation>();
+                    if (tag.contains("Animations")) {
+                        var at = tag.getList("Animations", net.minecraft.nbt.CompoundTag.TAG_COMPOUND);
+                        for (int ai = 0; ai < at.size(); ai++)
+                            anims.add(com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation.deserialize(at.getCompound(ai)));
+                    }
                     slots.add(new SlotRenderData(sp, tag.getInt("posX"), tag.getInt("posY"),
                             tag.getFloat("scale"), tag.getString("text"), tag.getInt("displayLine"),
-                            tag.getFloat("rotation"), tag.getInt("color"), tag.getInt("alpha")));
+                            tag.getInt("DisplayMode"), tag.getFloat("DisplayMax"), tag.getFloat("DisplayMin"),
+                            tag.getString("DisplayUnit"),
+                            tag.getFloat("rotation"), tag.getInt("color"), tag.getInt("alpha"),
+                            li, frozenMap.getOrDefault(li, false), anims));
                 }
             }
             if (data.contains("staticCount")) {
                 int count = data.getInt("staticCount");
                 for (int i = 0; i < count; i++) {
                     CompoundTag tag = data.getCompound("static_" + i);
+                    int li = tag.getInt("layerIndex");
                     staticTexts.add(new StaticTextRenderData(tag.getString("text"),
                             tag.getInt("posX"), tag.getInt("posY"), tag.getFloat("scale"),
-                            tag.getFloat("rotation"), tag.getInt("color"), tag.getInt("alpha")));
+                            tag.getFloat("rotation"), tag.getInt("color"), tag.getInt("alpha"),
+                            li, frozenMap.getOrDefault(li, false)));
                 }
             }
             if (data.contains("imageCount")) {
                 int count = data.getInt("imageCount");
                 for (int i = 0; i < count; i++) {
                     CompoundTag tag = data.getCompound("image_" + i);
-                    UUID id = tag.getUUID("ImageId");
-                    byte[] bytes = tag.getByteArray("ImageData");
+                    UUID id = tag.getUUID("ImageId"); byte[] bytes = tag.getByteArray("ImageData");
+                    int li = tag.getInt("layerIndex");
                     images.add(new ImageRenderData(id, bytes, tag.getString("FileName"),
                             tag.getInt("PosX"), tag.getInt("PosY"), tag.getFloat("Scale"),
-                            tag.getFloat("Rotation"), tag.getInt("Alpha")));
+                            tag.getFloat("Rotation"), tag.getInt("Alpha"),
+                            li, frozenMap.getOrDefault(li, false)));
                     DynamicTextureCache.ensureUpdated(id, bytes);
                 }
             }
@@ -231,9 +241,11 @@ public class ClientHudData {
                 int count = data.getInt("radarCount");
                 for (int i = 0; i < count; i++) {
                     CompoundTag tag = data.getCompound("radar_" + i);
+                    int li = tag.getInt("layerIndex");
                     radarSlots.add(new RadarRenderData(tag.getInt("PosX"), tag.getInt("PosY"),
                             tag.getFloat("Scale"), tag.getFloat("Rotation"),
-                            tag.getInt("Alpha"), tag.getInt("RadarRange")));
+                            tag.getInt("Alpha"), tag.getInt("RadarRange"),
+                            li, frozenMap.getOrDefault(li, false)));
                 }
             }
         }

@@ -85,7 +85,8 @@ public class OmniCoreBlock extends HorizontalDirectionalBlock implements EntityB
         if (!(coreBe instanceof OmniCoreBlockEntity core)) return;
         for (Direction dir : Direction.values()) {
             BlockPos neighbor = corePos.relative(dir);
-            if (level.getBlockState(neighbor).is(ModBlocks.DISPLAY_TERMINAL.get())) {
+            if (level.getBlockState(neighbor).is(ModBlocks.DISPLAY_TERMINAL.get())
+                    || level.getBlockState(neighbor).is(ModBlocks.DISPLAY_TERMINAL_PRO.get())) {
                 core.setBoundTerminal(neighbor);
             }
         }

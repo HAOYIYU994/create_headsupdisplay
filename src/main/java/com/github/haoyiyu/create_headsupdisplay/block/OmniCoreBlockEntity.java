@@ -2,6 +2,7 @@ package com.github.haoyiyu.create_headsupdisplay.block;
 
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
 import com.github.haoyiyu.create_headsupdisplay.config.DisplaySlot;
+import com.github.haoyiyu.create_headsupdisplay.config.ImageSlot;
 import com.github.haoyiyu.create_headsupdisplay.config.RadarSlot;
 import com.github.haoyiyu.create_headsupdisplay.config.TranslationConfig;
 import com.github.haoyiyu.create_headsupdisplay.network.OpenOmniCoreScreenPayload;
@@ -46,6 +47,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
     }
 
     private boolean autoSortEnabled = true;
+    private int nextSourceId = 1; // 固定的数字编码计数器
     private List<BlockPos> boundTerminals = new ArrayList<>();
     private Map<BlockPos, String> terminalNames = new HashMap<>();
     private List<RedstoneSource> sources = new ArrayList<>();
@@ -103,6 +105,9 @@ public class OmniCoreBlockEntity extends BlockEntity {
             if (be instanceof DisplayTerminalBlockEntity terminal) {
                 for (var img : new ArrayList<>(terminal.getImageSlots()))
                     terminal.removeImageSlot(img.getImageId());
+            } else if (be instanceof DisplayTerminalProBlockEntity terminal) {
+                for (var img : new ArrayList<>(terminal.getImageSlots()))
+                    terminal.removeImageSlot(img.getImageId());
             }
         }
         sentSources.clear();
@@ -113,6 +118,8 @@ public class OmniCoreBlockEntity extends BlockEntity {
         for (BlockPos tp : boundTerminals) {
             BlockEntity be = level.getBlockEntity(tp);
             if (be instanceof DisplayTerminalBlockEntity terminal) {
+                terminal.setRadarSlots(new ArrayList<>());
+            } else if (be instanceof DisplayTerminalProBlockEntity terminal) {
                 terminal.setRadarSlots(new ArrayList<>());
             }
         }
@@ -255,8 +262,16 @@ public class OmniCoreBlockEntity extends BlockEntity {
         }
     }
 
+    private int assignSourceId(RedstoneSource src) {
+        int id = nextSourceId++;
+        src.sourceId = id;
+        return id;
+    }
+
     public void addRedstoneSource(String name, ItemStack frequencyItem1, ItemStack frequencyItem2) {
-        sources.add(new RedstoneSource(name, frequencyItem1, frequencyItem2));
+        RedstoneSource src = new RedstoneSource(name, frequencyItem1, frequencyItem2);
+        assignSourceId(src);
+        sources.add(src);
         setChanged();
     }
 
@@ -264,7 +279,9 @@ public class OmniCoreBlockEntity extends BlockEntity {
     public void addImageSource(UUID imageId, String fileName, byte[] imageData) {
         if (imageData == null || imageData.length > com.github.haoyiyu.create_headsupdisplay.config.ModConfig.IMAGE_MAX_SIZE_KB.get() * 1024) return;
         if (imageData.length < 8) return;
-        sources.add(RedstoneSource.image(imageId, fileName, imageData));
+        RedstoneSource src = RedstoneSource.image(imageId, fileName, imageData);
+        assignSourceId(src);
+        sources.add(src);
         setChanged();
     }
 
@@ -297,23 +314,42 @@ public class OmniCoreBlockEntity extends BlockEntity {
         for (BlockPos tp : boundTerminals) {
             BlockEntity be = level.getBlockEntity(tp);
             if (be instanceof DisplayTerminalBlockEntity terminal) {
-                if (sourceIndex >= 0 && sourceIndex < sources.size()) {
-                    RedstoneSource src = sources.get(sourceIndex);
-                    if (src.sourceType == RedstoneSource.Type.IMAGE && src.imageId != null) {
-                        terminal.removeImageSlot(src.imageId);
-                    } else if (src.translation != null && src.translation.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL) {
-                        UUID slotId = UUID.nameUUIDFromBytes(("img_cond_" + src.name).getBytes());
-                        terminal.removeImageSlot(slotId);
-                    } else {
-                        BlockPos virtualPos = sentSources.get(sourceIndex);
-                        if (virtualPos != null) {
-                            terminal.removeSlot(virtualPos);
-                        }
-                    }
-                }
+                removeSourceFromTerminal(terminal, sourceIndex);
+            } else if (be instanceof DisplayTerminalProBlockEntity terminalPro) {
+                removeSourceFromTerminalPro(terminalPro, sourceIndex);
             }
         }
         sentSources.remove(sourceIndex);
+    }
+
+    private void removeSourceFromTerminal(DisplayTerminalBlockEntity terminal, int sourceIndex) {
+        if (sourceIndex >= 0 && sourceIndex < sources.size()) {
+            RedstoneSource src = sources.get(sourceIndex);
+            if (src.sourceType == RedstoneSource.Type.IMAGE && src.imageId != null) {
+                terminal.removeImageSlot(src.imageId);
+            } else if (src.translation != null && src.translation.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL) {
+                UUID slotId = UUID.nameUUIDFromBytes(("img_cond_" + src.name).getBytes());
+                terminal.removeImageSlot(slotId);
+            } else {
+                BlockPos virtualPos = sentSources.get(sourceIndex);
+                if (virtualPos != null) terminal.removeSlot(virtualPos);
+            }
+        }
+    }
+
+    private void removeSourceFromTerminalPro(DisplayTerminalProBlockEntity terminal, int sourceIndex) {
+        if (sourceIndex >= 0 && sourceIndex < sources.size()) {
+            RedstoneSource src = sources.get(sourceIndex);
+            if (src.sourceType == RedstoneSource.Type.IMAGE && src.imageId != null) {
+                terminal.removeImageSlot(src.imageId);
+            } else if (src.translation != null && src.translation.getMode() == TranslationConfig.Mode.IMAGE_CONDITIONAL) {
+                UUID slotId = UUID.nameUUIDFromBytes(("img_cond_" + src.name).getBytes());
+                terminal.removeImageSlot(slotId);
+            } else {
+                BlockPos virtualPos = sentSources.get(sourceIndex);
+                if (virtualPos != null) terminal.removeSlot(virtualPos);
+            }
+        }
     }
 
     /** 将所有源发送到绑定的终端 */
@@ -473,6 +509,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
         src.sourceType = RedstoneSource.Type.DISPLAY_LINK;
         src.displayLinkSourcePos = sourcePos;
         src.displayLinkText = text;
+        assignSourceId(src);
         sources.add(0, src);
         // 重映射 sentSources：所有索引 +1
         Map<Integer, BlockPos> remapped = new HashMap<>();
@@ -525,9 +562,11 @@ public class OmniCoreBlockEntity extends BlockEntity {
                 BlockEntity be = level.getBlockEntity(tp);
                 if (be instanceof DisplayTerminalBlockEntity terminal) {
                     terminal.addImageSlot(src.imageId, src.imageFileName, src.imageData);
+                } else if (be instanceof DisplayTerminalProBlockEntity terminal) {
+                    terminal.cacheImageSource(src.imageId, src.imageFileName, src.imageData);
                 }
             }
-            sentSources.put(sourceIndex, new BlockPos(0, src.imageId.hashCode(), 0));
+            sentSources.put(sourceIndex, new BlockPos(src.sourceId, 0, 0));
             setChanged();
             return;
         }
@@ -544,19 +583,23 @@ public class OmniCoreBlockEntity extends BlockEntity {
                         BlockEntity be = level.getBlockEntity(tp);
                         if (be instanceof DisplayTerminalBlockEntity terminal) {
                             terminal.updateImageData(slotId, imgSrc.imageFileName, imgSrc.imageData);
+                        } else if (be instanceof DisplayTerminalProBlockEntity terminal) {
+                            terminal.cacheImageSource(slotId, imgSrc.imageFileName, imgSrc.imageData);
                         }
                     }
-                    sentSources.put(sourceIndex, new BlockPos(0, slotId.hashCode(), 0));
+                    sentSources.put(sourceIndex, new BlockPos(src.sourceId, 0, 0));
                     setChanged();
                     return;
                 }
             }
-            // 没有选中图片 → 发送透明图片保持槽位
+            // 没有选中图片 → 缓存透明图片
             UUID slotId = UUID.nameUUIDFromBytes(("img_cond_" + src.name).getBytes());
             for (BlockPos tp : targets) {
                 BlockEntity be = level.getBlockEntity(tp);
                 if (be instanceof DisplayTerminalBlockEntity terminal) {
                     terminal.updateImageData(slotId, "", BLANK_PNG);
+                } else if (be instanceof DisplayTerminalProBlockEntity terminal) {
+                    terminal.cacheImageSource(slotId, "", BLANK_PNG);
                 }
             }
             sentSources.put(sourceIndex, new BlockPos(0, slotId.hashCode(), 0));
@@ -564,29 +607,43 @@ public class OmniCoreBlockEntity extends BlockEntity {
             return;
         }
 
-        BlockPos virtualPos = new BlockPos(0, 0, Math.abs(src.name.hashCode()));
+        BlockPos virtualPos = new BlockPos(src.sourceId, 0, 0); // 稳定的数字编码
 
         String displayText = src.displayLinkText != null ? src.displayLinkText : getDisplayText(src);
         String cleanName = src.name.replaceAll("§[0-9a-fk-or]", "");
 
         for (BlockPos tp : targets) {
             BlockEntity be = level.getBlockEntity(tp);
-            if (!(be instanceof DisplayTerminalBlockEntity terminal)) continue;
-
-            boolean sentBefore = sentSources.containsKey(sourceIndex);
-            if (!sentBefore) {
-                // 按名称判断终端是否已有此数据源的槽位，有则保留用户配置不被覆盖
-                if (terminal.getSlotBySourceName(cleanName) == null) {
-                    terminal.updateSlotConfig(virtualPos,
-                            10, 50 + sentSources.size() * 20,
-                            1.0f, 0f, 0xFFFFFF, 255);
-                }
+            if (be instanceof DisplayTerminalBlockEntity terminal) {
+                sendToTerminalInternal(terminal, virtualPos, cleanName, displayText);
+            } else if (be instanceof DisplayTerminalProBlockEntity terminalPro) {
+                sendToTerminalProInternal(terminalPro, virtualPos, cleanName, displayText);
             }
-            terminal.updateSlotData(virtualPos, displayText);
-            terminal.updateSlotSourceName(virtualPos, cleanName);
         }
         sentSources.put(sourceIndex, virtualPos);
         setChanged();
+    }
+
+    private void sendToTerminalInternal(DisplayTerminalBlockEntity terminal, BlockPos virtualPos, String cleanName, String displayText) {
+        if (terminal.getSlotBySourceName(cleanName) == null) {
+            terminal.updateSlotConfig(virtualPos,
+                    10, 50 + sentSources.size() * 20,
+                    1.0f, 0f, 0xFFFFFF, 255);
+        }
+        terminal.updateSlotData(virtualPos, displayText);
+        terminal.updateSlotSourceName(virtualPos, cleanName);
+    }
+
+    private void sendToTerminalProInternal(DisplayTerminalProBlockEntity terminal, BlockPos virtualPos, String cleanName, String displayText) {
+        // 存入数据源缓存（不入画布）
+        terminal.getSourceCache().put(virtualPos, displayText);
+        terminal.getSourceNameCache().put(virtualPos, cleanName);
+        // 如果画布上已有槽位，同步更新数据
+        if (terminal.findSlot(virtualPos) != null) {
+            terminal.updateSlotDataAndStyle(virtualPos, displayText, 0, cleanName);
+        }
+        terminal.setChanged();
+        terminal.syncToBoundPlayers();
     }
 
     /** 发送到所有终端（兼容旧调用） */
@@ -726,15 +783,24 @@ public class OmniCoreBlockEntity extends BlockEntity {
                                     existing.setImageData(imgSrc.imageData);
                                     terminal.setChanged();
                                 } else {
-                                    // 图片槽位被用户手动删除，从 sentSources 中移除以停止跟踪
                                     be.sentSources.remove(idx);
                                     be.setChanged();
                                 }
                                 if (changed) terminal.syncToBoundPlayers();
                             }
                         } else if (changed) {
-                            // 没有选中图片 → 更新为透明图片保持槽位不变
                             terminal.updateImageData(slotId, "", BLANK_PNG);
+                        }
+                    } else if (terminalBe instanceof DisplayTerminalProBlockEntity terminal) {
+                        UUID slotId = UUID.nameUUIDFromBytes(("img_cond_" + src.name).getBytes());
+                        if (imgName != null && !imgName.isEmpty()) {
+                            RedstoneSource imgSrc = be.findImageSourceByName(imgName);
+                            if (imgSrc != null) {
+                                terminal.cacheImageSource(slotId, imgSrc.imageFileName, imgSrc.imageData);
+                                if (changed) terminal.syncToBoundPlayers();
+                            }
+                        } else if (changed) {
+                            terminal.cacheImageSource(slotId, "", BLANK_PNG);
                         }
                     }
                 }
@@ -755,6 +821,14 @@ public class OmniCoreBlockEntity extends BlockEntity {
                     foundAny = true;
                     if (!newText.equals(src.lastSentText)) {
                         terminal.updateSlotData(virtualPos, newText);
+                    }
+                } else if (terminalBe instanceof DisplayTerminalProBlockEntity terminalPro &&
+                        (terminalPro.findSlot(virtualPos) != null || terminalPro.getSourceCache().containsKey(virtualPos))) {
+                    foundAny = true;
+                    terminalPro.getSourceCache().put(virtualPos, newText);
+                    terminalPro.setChanged();
+                    if (terminalPro.findSlot(virtualPos) != null && !newText.equals(src.lastSentText)) {
+                        terminalPro.updateSlotData(virtualPos, newText);
                     }
                 }
             }
@@ -815,6 +889,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
         for (RedstoneSource src : sources) {
             CompoundTag srcTag = new CompoundTag();
             srcTag.putString("type", src.sourceType.name());
+            srcTag.putInt("sourceId", src.sourceId);
             srcTag.putString("name", src.name);
             srcTag.put("freqItem1", src.frequencyItem1.saveOptional(registries));
             srcTag.put("freqItem2", src.frequencyItem2.saveOptional(registries));
@@ -862,6 +937,8 @@ public class OmniCoreBlockEntity extends BlockEntity {
             pluginTag.add(pluginInventory.getItem(i).saveOptional(registries));
         }
         tag.put("Plugins", pluginTag);
+        tag.putInt("NextSourceId", nextSourceId);
+        tag.putBoolean("AutoSort", autoSortEnabled);
     }
 
     @Override
@@ -890,6 +967,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
             ItemStack freqItem1 = ItemStack.parseOptional(registries, srcTag.getCompound("freqItem1"));
             ItemStack freqItem2 = ItemStack.parseOptional(registries, srcTag.getCompound("freqItem2"));
             RedstoneSource src = new RedstoneSource(name, freqItem1, freqItem2);
+            src.sourceId = srcTag.getInt("sourceId"); // 还原固定编码，0 表示旧数据
             if (srcTag.contains("type")) {
                 try { src.sourceType = RedstoneSource.Type.valueOf(srcTag.getString("type")); }
                 catch (IllegalArgumentException e) { src.sourceType = RedstoneSource.Type.REDSTONE; }
@@ -939,6 +1017,13 @@ public class OmniCoreBlockEntity extends BlockEntity {
                 pluginInventory.setItem(i, ItemStack.parseOptional(registries, pluginTag.getCompound(i)));
             }
         }
+        nextSourceId = tag.getInt("NextSourceId");
+        if (nextSourceId == 0) nextSourceId = 1;
+        autoSortEnabled = !tag.contains("AutoSort") || tag.getBoolean("AutoSort");
+        // 给旧数据（没有 sourceId）的源补上编码
+        for (RedstoneSource src : sources) {
+            if (src.sourceId == 0) assignSourceId(src);
+        }
     }
 
     private static class RedstoneSource {
@@ -959,6 +1044,8 @@ public class OmniCoreBlockEntity extends BlockEntity {
         UUID imageId;
         String imageFileName;
         byte[] imageData;
+
+        int sourceId; // 固定的数字编码，不随名称变化
 
         RedstoneSource(String name, ItemStack item1, ItemStack item2) {
             this.name = name;

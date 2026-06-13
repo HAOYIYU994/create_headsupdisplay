@@ -4,6 +4,7 @@ import com.github.haoyiyu.create_headsupdisplay.client.ClientHudData;
 import com.github.haoyiyu.create_headsupdisplay.client.DynamicTextureCache;
 import com.github.haoyiyu.create_headsupdisplay.item.HeadMountDisplayItem;
 import com.mojang.blaze3d.systems.RenderSystem;
+import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
@@ -11,307 +12,470 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderGuiEvent;
 
-import java.util.List;
+import java.util.*;
 
 @EventBusSubscriber(Dist.CLIENT)
 public class HudOverlayRenderer {
+
+    // ========== 凝滞器：世界锁定 + 深度视差 ==========
+
+    /** 世界空间锚点方向 (yaw, pitch)，按元素标识符索引 */
+    private static final Map<String, float[]> frozenWorldAnchors = new HashMap<>();
+    private static final float FROZEN_DEFAULT_DEPTH = 5.0f; // 默认深度（方块）
+    private static final float X_SENSITIVITY = 0.75f; // X 轴世界锁定强度（1.0=完整）
+
+    /** 上一帧相机位置，用于计算视差位移 */
+    private static double lastCamX = Double.NaN, lastCamY, lastCamZ;
+    private static float lastFov = -1;
+
     @SubscribeEvent
     public static void onRenderGui(RenderGuiEvent.Post event) {
         Minecraft mc = Minecraft.getInstance();
         Player player = mc.player;
         if (player == null) return;
-
         ItemStack helmet = player.getInventory().armor.get(3);
         if (!(helmet.getItem() instanceof HeadMountDisplayItem)) return;
         BlockPos boundTerminal = HeadMountDisplayItem.getBoundTerminalPos(helmet);
-        if (boundTerminal == null) return;
+        if (boundTerminal == null) {
+            // 脱下头盔时清理锚点，避免多终端串数据
+            frozenWorldAnchors.clear();
+            lastCamX = Double.NaN;
+            return;
+        }
 
-        GuiGraphics graphics = event.getGuiGraphics();
+        // 读取终端朝向作为冻结图层的参考方向（yaw 锚点以此为准，而非玩家朝向）
+        float terminalYaw = player.getYRot(); // fallback
+        float terminalPitch = 0f;
+        float[] physics = null;
+        if (mc.level != null) {
+            var state = mc.level.getBlockState(boundTerminal);
+            boolean hasFacing = state.hasProperty(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING);
+            float rawFacingYaw = hasFacing
+                    ? state.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.HORIZONTAL_FACING).toYRot()
+                    : terminalYaw;
+            float cachedYaw = SablePhysicsHelper.getOrCacheFacingYaw(boundTerminal, rawFacingYaw, hasFacing);
+            terminalYaw = cachedYaw;
+            // 尝试从 sable 物理引擎获取真实世界朝向（航空学联动）
+            physics = SablePhysicsHelper.tryGetPhysicsOrientation(mc.level, boundTerminal, cachedYaw, player);
+            // 玩家坐在物理体坐垫上 → 用本地坐标，物理旋转在本地空间不体现
+            boolean playerOnBody = player.getVehicle() != null && physics != null;
+            if (physics != null && !playerOnBody) {
+                terminalYaw = physics[0];
+                terminalPitch = physics[1];
+            } else if (playerOnBody) {
+                // 本地模式也减 90°（SubLevel 坐标与终端 FACING 的固定偏差）
+                terminalYaw = cachedYaw - 90f;
+            }
+        }
+
+        GuiGraphics g = event.getGuiGraphics();
         var font = mc.font;
 
-        // 图片槽位
+        // ================================================================
+        //  帧初始化：相机参数 & 视差
+        // ================================================================
+        Camera camera = mc.gameRenderer.getMainCamera();
+        Vec3 camPos = camera.getPosition();
+        // 物理体上：本地空间不需要四元数旋转
+        float playerYaw = player.getYRot();
+        float playerPitch = player.getXRot();
+
+        int screenW = mc.getWindow().getGuiScaledWidth();
+        int screenH = mc.getWindow().getGuiScaledHeight();
+        float fov = mc.options.fov().get().floatValue();
+
+        // 焦距（像素）：屏幕半宽 / tan(fov/2)
+        float halfFovRad = (float) Math.toRadians(fov / 2.0);
+        float focalPx = (screenW / 2.0f) / (float) Math.tan(halfFovRad);
+
+        // 相机位移（用于深度视差）
+        double camDX = 0, camDY = 0, camDZ = 0;
+        if (!Double.isNaN(lastCamX) && lastFov == fov) {
+            camDX = camPos.x - lastCamX;
+            camDY = camPos.y - lastCamY;
+            camDZ = camPos.z - lastCamZ;
+        }
+        lastCamX = camPos.x; lastCamY = camPos.y; lastCamZ = camPos.z;
+        lastFov = fov;
+
+        // 相机局部坐标轴
+        float yawRad = (float) Math.toRadians(playerYaw);
+        float pitchRad = (float) Math.toRadians(playerPitch);
+        float cosY = Mth.cos(-yawRad + (float) Math.PI / 2f);
+        float sinY = Mth.sin(-yawRad + (float) Math.PI / 2f);
+        // 右向量（忽略 pitch 抬头时右向量仍水平）
+        Vec3 camRight = new Vec3(cosY, 0, sinY);
+        Vec3 camUp = new Vec3(
+                -Mth.sin(-yawRad + (float) Math.PI / 2f) * Mth.sin(pitchRad),
+                Mth.cos(pitchRad),
+                Mth.cos(-yawRad + (float) Math.PI / 2f) * Mth.sin(pitchRad)
+        );
+        double latMove = camDX * camRight.x + camDY * camRight.y + camDZ * camRight.z;
+        double upMove = camDX * camUp.x + camDY * camUp.y + camDZ * camUp.z;
+
+        // ================================================================
+        //  图片
+        // ================================================================
         var images = ClientHudData.getImagesFor(boundTerminal);
-        if (images != null && !images.isEmpty()) {
+        if (images != null) {
             RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
-            for (var img : images) {
-                graphics.pose().pushPose();
-                graphics.pose().translate(img.posX, img.posY, 0);
-                graphics.pose().scale(img.scale, img.scale, 1.0f);
-                graphics.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(img.rotation));
+            for (int idx = 0; idx < images.size(); idx++) {
+                var img = images.get(idx);
+                int ix, iy;
+                if (img.frozen) {
+                    String key = "img:" + img.imageId;
+                    float[] wp = getOrCreateWorldAnchor(key, img.posX, img.posY,
+                            terminalYaw, terminalPitch, screenW, screenH, focalPx, FROZEN_DEFAULT_DEPTH);
+                    ix = (int) projectWorldToScreenX(wp[0], playerYaw, screenW, focalPx,
+                            latMove, wp[2], focalPx);
+                    float wy = projectWorldToScreenYFull(wp[1], playerPitch, screenH, focalPx, upMove, wp[2], focalPx);
+                    iy = (int)(img.posY + (wy - img.posY) * Y_BLEND);
+                    g.pose().pushPose();
+                    g.pose().translate(ix, iy, 0);
+                    g.pose().scale(img.scale, img.scale, 1f);
+                    g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(img.rotation));
+                } else {
+                    g.pose().pushPose();
+                    g.pose().translate(img.posX, img.posY, 0);
+                    g.pose().scale(img.scale, img.scale, 1f);
+                    g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(img.rotation));
+                }
                 ResourceLocation tex = DynamicTextureCache.getOrCreate(img.imageId, img.imageData);
                 if (tex != null) {
-                    int w = DynamicTextureCache.getWidth(img.imageId);
-                    int h = DynamicTextureCache.getHeight(img.imageId);
-                    if (w > 0 && h > 0) {
+                    int iw = DynamicTextureCache.getWidth(img.imageId);
+                    int ih = DynamicTextureCache.getHeight(img.imageId);
+                    if (iw > 0 && ih > 0) {
                         RenderSystem.setShaderColor(1f, 1f, 1f, img.alpha / 255f);
-                        graphics.blit(tex, 0, 0, 0, 0, w, h, w, h);
+                        g.blit(tex, 0, 0, 0, 0, iw, ih, iw, ih);
                     }
                 }
-                graphics.pose().popPose();
+                g.pose().popPose();
             }
             RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
             RenderSystem.disableBlend();
         }
 
-        // 雷达图槽位
-        var radarSlots = ClientHudData.getRadarSlotsFor(boundTerminal);
-        var radarTracks = ClientHudData.getRadarTracks();
-        if (radarSlots != null && !radarSlots.isEmpty() && mc.player != null) {
-            for (var slot : radarSlots) {
-                renderRadarSlot(graphics, mc, slot, radarTracks);
+        // ================================================================
+        //  雷达
+        // ================================================================
+        var radars = ClientHudData.getRadarSlotsFor(boundTerminal);
+        var tracks = ClientHudData.getRadarTracks();
+        if (radars != null && mc.player != null) {
+            for (int idx = 0; idx < radars.size(); idx++) {
+                var slot = radars.get(idx);
+                int rx, ry;
+                if (slot.frozen) {
+                    String key = "radar:" + idx;
+                    float[] wp = getOrCreateWorldAnchor(key, slot.posX, slot.posY,
+                            terminalYaw, terminalPitch, screenW, screenH, focalPx, FROZEN_DEFAULT_DEPTH);
+                    rx = (int) projectWorldToScreenX(wp[0], playerYaw, screenW, focalPx,
+                            latMove, wp[2], focalPx);
+                    float wyr = projectWorldToScreenYFull(wp[1], playerPitch, screenH, focalPx, upMove, wp[2], focalPx);
+                    ry = (int)(slot.posY + (wyr - slot.posY) * Y_BLEND);
+                } else {
+                    rx = slot.posX; ry = slot.posY;
+                }
+                renderRadarSlot(g, mc, slot, tracks, rx, ry);
             }
         }
 
-        // 数据源槽位
+        // ================================================================
+        //  数据源槽位
+        // ================================================================
         var slots = ClientHudData.getSlotsFor(boundTerminal);
         if (slots != null) {
             for (var slot : slots) {
-                graphics.pose().pushPose();
-                graphics.pose().translate(slot.posX, slot.posY, 0);
-                graphics.pose().scale(slot.scale, slot.scale, 1.0f);
-                graphics.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(slot.rotation));
-                int textColor = (slot.alpha << 24) | (slot.color & 0x00FFFFFF);
-                String text = slot.text.replaceAll("§[0-9a-fk-or]", "");
-                if (slot.displayLine == 2) {
-                    String[] parts = text.split("/");
-                    if (parts.length == 2) {
-                        try {
-                            int current = Integer.parseInt(parts[0].trim());
-                            int max = Integer.parseInt(parts[1].trim());
-                            if (max > 0) {
-                                float percent = (float) current / max;
-                                int barWidth = 80, barHeight = 10;
-                                graphics.fill(0, 0, barWidth, barHeight, 0xFF333333);
-                                graphics.fill(0, 0, (int)(barWidth * percent), barHeight, 0xFF00FF00);
-                                String display = current + "/" + max;
-                                int textWidth = font.width(display);
-                                graphics.drawString(font, display, (barWidth - textWidth) / 2, barHeight + 2, textColor, true);
-                            } else {
-                                graphics.drawString(font, text, 0, 0, textColor, true);
-                            }
-                        } catch (NumberFormatException e) {
-                            graphics.drawString(font, text, 0, 0, textColor, true);
-                        }
-                    } else {
-                        graphics.drawString(font, text, 0, 0, textColor, true);
-                    }
+                // 动画求值
+                var animRes = new com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.Result();
+                com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.evaluate(slot.animations, slot.text, animRes,
+                    new com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.SlotRef() {
+                        public float getPosX() { return (float)slot.posX; } public void setPosX(float v) {}
+                        public float getPosY() { return (float)slot.posY; } public void setPosY(float v) {}
+                        public float getScale() { return slot.scale; } public void setScale(float v) {}
+                        public float getRotation() { return slot.rotation; } public void setRotation(float v) {}
+                        public int getColor() { return slot.color; } public void setColor(int v) {}
+                        public int getAlpha() { return slot.alpha; } public void setAlpha(int v) {}
+                    });
+                float animPosX = animRes.posX != null ? animRes.posX : slot.posX;
+                float animPosY = animRes.posY != null ? animRes.posY : slot.posY;
+                float animScale = animRes.scale != null ? animRes.scale : slot.scale;
+                float animRotation = animRes.rotation != null ? animRes.rotation : slot.rotation;
+                int animColor = animRes.color != null ? animRes.color : slot.color;
+                int animAlpha = animRes.alpha != null ? animRes.alpha : slot.alpha;
+
+                int sx, sy;
+                if (slot.frozen) {
+                    String key = "slot:" + slot.sourcePos.toShortString();
+                    float[] wp = getOrCreateWorldAnchor(key, (int)animPosX, (int)animPosY,
+                            terminalYaw, terminalPitch, screenW, screenH, focalPx, FROZEN_DEFAULT_DEPTH);
+                    sx = (int) projectWorldToScreenX(wp[0], playerYaw, screenW, focalPx,
+                            latMove, wp[2], focalPx);
+                    float wys = projectWorldToScreenYFull(wp[1], playerPitch, screenH, focalPx, upMove, wp[2], focalPx);
+                    sy = (int)(animPosY + (wys - animPosY) * Y_BLEND);
                 } else {
-                    graphics.drawString(font, text, 0, 0, textColor, true);
+                    sx = (int)animPosX; sy = (int)animPosY;
                 }
-                graphics.pose().popPose();
+                g.pose().pushPose();
+                g.pose().translate(sx, sy, 0);
+                g.pose().scale(animScale, animScale, 1f);
+                g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(animRotation));
+                int tc = (animAlpha << 24) | (animColor & 0xFFFFFF);
+                String text = slot.text.replaceAll("§[0-9a-fk-or]", "");
+                switch (slot.displayMode) {
+                    case 1 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderBar(
+                            g, font, text, tc, slot.displayMax, slot.displayUnit, 120, 40);
+                    case 2 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderAltimeter(
+                            g, font, text, tc, slot.displayMin, slot.displayMax, slot.displayUnit, 80, 160);
+                    case 3 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderDial(
+                            g, font, text, tc, slot.displayMax, slot.displayUnit, 100, 100);
+                    case 4 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderDigital(
+                            g, font, text, tc, slot.displayUnit, 120, 28);
+                    case 5 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderHudAltimeter(
+                            g, font, text, tc, slot.displayMin, slot.displayMax, slot.displayUnit, 80, 160);
+                    default -> g.drawString(font, text, 0, 0, tc, true);
+                }
+                g.pose().popPose();
             }
         }
 
-        // 静态文本槽位
-        var staticSlots = ClientHudData.getStaticTextsFor(boundTerminal);
-        if (staticSlots != null && !staticSlots.isEmpty()) {
-            for (var slot : staticSlots) {
-                graphics.pose().pushPose();
-                graphics.pose().translate(slot.posX, slot.posY, 0);
-                graphics.pose().scale(slot.scale, slot.scale, 1.0f);
-                graphics.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(slot.rotation));
+        // ================================================================
+        //  静态文本
+        // ================================================================
+        var sts = ClientHudData.getStaticTextsFor(boundTerminal);
+        if (sts != null) {
+            for (int idx = 0; idx < sts.size(); idx++) {
+                var slot = sts.get(idx);
+                int tx, ty;
+                if (slot.frozen) {
+                    String key = "text:" + slot.text.hashCode() + ":" + slot.layerIndex;
+                    float[] wp = getOrCreateWorldAnchor(key, slot.posX, slot.posY,
+                            terminalYaw, terminalPitch, screenW, screenH, focalPx, FROZEN_DEFAULT_DEPTH);
+                    tx = (int) projectWorldToScreenX(wp[0], playerYaw, screenW, focalPx,
+                            latMove, wp[2], focalPx);
+                    float wyt = projectWorldToScreenYFull(wp[1], playerPitch, screenH, focalPx, upMove, wp[2], focalPx);
+                    ty = (int)(slot.posY + (wyt - slot.posY) * Y_BLEND);
+                } else {
+                    tx = slot.posX; ty = slot.posY;
+                }
+                g.pose().pushPose();
+                g.pose().translate(tx, ty, 0);
+                g.pose().scale(slot.scale, slot.scale, 1f);
+                g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(slot.rotation));
                 int argb = (slot.alpha << 24) | (slot.color & 0x00FFFFFF);
-                graphics.drawString(font, slot.text.replaceAll("§[0-9a-fk-or]", ""), 0, 0, argb, false);
-                graphics.pose().popPose();
+                g.drawString(font, slot.text.replaceAll("§[0-9a-fk-or]", ""), 0, 0, argb, false);
+                g.pose().popPose();
             }
         }
     }
 
-    private static final ResourceLocation TEX_FILLER    = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/radar_bg_filler.png");
-    private static final ResourceLocation TEX_CIRCLE    = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/radar_bg_circle.png");
-    private static final ResourceLocation TEX_SWEEP     = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/radar_sweep.png");
-    private static final ResourceLocation TEX_PLAYER    = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/player.png");
-    private static final ResourceLocation TEX_ENTITY    = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/entity_hitbox.png");
+    // ================================================================
+    //  世界锚点 & 投影工具方法
+    // ================================================================
+
+    /**
+     * 获取或创建元素的世界空间锚点。
+     * 首次见到的元素：根据玩家当前朝向 + 元素屏幕偏移量计算世界锚点方向。
+     * 已存在的元素：直接返回存储的锚点。
+     *
+     * @return float[4]: [worldYaw, worldPitch, posX, depth]
+     */
+    private static float[] getOrCreateWorldAnchor(String key, int posX, int posY,
+                                                   float referenceYaw, float referencePitch,
+                                                   int screenW, int screenH,
+                                                   float focalPx, float depth) {
+        float[] stored = frozenWorldAnchors.get(key);
+        // 检查 posX/posY 是否变化（用户在配置界面移动了元素）
+        if (stored != null && (int) stored[2] == posX && (int) stored[3] == posY) {
+            // 锚点存的是角偏移量，每帧用当前 reference 实时计算世界角度（物理体旋转后自动跟随）
+            float worldYaw = referenceYaw + stored[0];
+            float worldPitch = Mth.clamp(referencePitch + stored[1], -90f, 90f);
+            return new float[]{worldYaw, worldPitch, depth};
+        }
+
+        // 新锚点：posX,posY 表示相对屏幕中心的偏移
+        float fromCenterX = posX - screenW / 2.0f;
+        float fromCenterY = posY - screenH / 2.0f;
+
+        // 屏幕偏移 → 角度偏移。锚点存 1/sensitivity 倍，投影时再乘 sensitivity 还原初始位置
+        float angleOffsetYaw = (float) Math.toDegrees(Math.atan2(fromCenterX, focalPx)) / X_SENSITIVITY;
+        float angleOffsetPitch = (float) Math.toDegrees(Math.atan2(fromCenterY, focalPx)); // Y 轴：屏幕上方为负（-pitch=抬头），下方为正
+
+        frozenWorldAnchors.put(key, new float[]{angleOffsetYaw, angleOffsetPitch, posX, posY});
+
+        float worldYaw = referenceYaw + angleOffsetYaw;
+        float worldPitch = Mth.clamp(referencePitch + angleOffsetPitch, -90f, 90f);
+        return new float[]{worldYaw, worldPitch, depth};
+    }
+
+    /** 将世界锚点 yaw 投影到当前屏幕 X 坐标，含深度视差 */
+    private static float projectWorldToScreenX(float worldYaw, float playerYaw,
+                                                int screenW, float focalPx,
+                                                double camLatMove, float depth, float fpx) {
+        float deltaYaw = Mth.wrapDegrees(worldYaw - playerYaw) * X_SENSITIVITY;
+        float screenX = screenW / 2.0f + (float) Math.tan(Math.toRadians(deltaYaw)) * focalPx;
+        // 深度视差：相机侧移造成屏幕偏移
+        if (depth > 0.1f) {
+            screenX -= (float) (camLatMove / depth) * fpx;
+        }
+        return screenX;
+    }
+
+    /** 将世界锚点 pitch 投影到当前屏幕 Y 坐标（完整世界锁定），含深度视差 */
+    private static float projectWorldToScreenYFull(float worldPitch, float playerPitch,
+                                                int screenH, float focalPx,
+                                                double camUpMove, float depth, float fpx) {
+        float deltaPitch = playerPitch - worldPitch;
+        float screenY = screenH / 2.0f - (float) Math.tan(Math.toRadians(deltaPitch)) * focalPx;
+        if (depth > 0.1f) {
+            screenY += (float) (camUpMove / depth) * fpx;
+        }
+        return screenY;
+    }
+
+    /** Y 轴世界锁定混合比例：50% 跟随世界角度，50% 保持原位 */
+    private static final float Y_BLEND = 0.65f;
+
+    // ================================================================
+    //  雷达渲染
+    // ================================================================
+
+    private static final ResourceLocation TEX_FILLER = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/radar_bg_filler.png");
+    private static final ResourceLocation TEX_CIRCLE = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/radar_bg_circle.png");
+    private static final ResourceLocation TEX_SWEEP = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/radar_sweep.png");
+    private static final ResourceLocation TEX_PLAYER = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/player.png");
+    private static final ResourceLocation TEX_ENTITY = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/entity_hitbox.png");
     private static final ResourceLocation TEX_CONTRAPTION = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/contraption_hitbox.png");
     private static final ResourceLocation TEX_PROJECTILE = ResourceLocation.fromNamespaceAndPath("create_radar", "textures/monitor_sprite/projectile.png");
 
-    private static final float ALPHA_BACKGROUND = 0.6f;
-    private static final float ALPHA_GRID = 0.1f;
-    private static final float ALPHA_SWEEP = 0.8f;
-    private static final float TRACK_POSITION_SCALE = 0.75f;
-    private static final int RADAR_TEXTURE_SIZE = 128;
-    private static final int TRACK_TEXTURE_SIZE = 256;
-    private static final int TRACK_MARKER_SOURCE_PX = 16;
-    private static final int TRACK_MARKER_BASE_PX = 18;
-
-    private static void renderRadarSlot(GuiGraphics gg, Minecraft mc, ClientHudData.RadarRenderData slot,
-                                  List<com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.RadarTrackEntry> tracks) {
-        // 优先使用雷达实际探测距离（自动同步），槽位配置作为后备
-        float actualRadarRange = ClientHudData.getRadarGlobalRange();
-        float range = actualRadarRange > 0 ? actualRadarRange : (slot.radarRange > 0 ? slot.radarRange : 50f);
-        float globalAngle = ClientHudData.getRadarSweepAngle();
-        double radarX = ClientHudData.getRadarX();
-        double radarZ = ClientHudData.getRadarZ();
+    private static void renderRadarSlot(GuiGraphics gg, Minecraft mc,
+            ClientHudData.RadarRenderData slot,
+            List<com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.RadarTrackEntry> tracks,
+            int renderX, int renderY) {
+        float range = ClientHudData.getRadarGlobalRange();
+        if (range <= 0) range = slot.radarRange > 0 ? slot.radarRange : 50f;
+        float gAngle = ClientHudData.getRadarSweepAngle();
+        double rX = ClientHudData.getRadarX(), rZ = ClientHudData.getRadarZ();
 
         gg.pose().pushPose();
-        gg.pose().translate(slot.posX, slot.posY, 0);
-        gg.pose().scale(slot.scale, slot.scale, 1.0f);
+        gg.pose().translate(renderX, renderY, 0);
+        gg.pose().scale(slot.scale, slot.scale, 1f);
         gg.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(slot.rotation));
 
-        int uiSize = 128;
-        float uiScale = uiSize / 320f;
-        int margin = 0;
-        int radarLeft = margin;
-        int radarTop = margin;
-        int radarSize = uiSize - margin * 2;
-        int gridColor = 0x00CC00;
-
+        int ui = 128, m = 0, rl = m, rt = m, rs = ui, gc = 0x00CC00;
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
 
-
-        // 网格
-        int halfCells = 5;
-        int totalCells = halfCells * 2;
-        float spacing = radarSize / (float) totalCells;
-        int ga = (int)(ALPHA_GRID * slot.alpha / 255f * 255);
-        int gridArg = (ga << 24) | (gridColor & 0xFFFFFF);
-        for (int i = 0; i <= totalCells; i++) {
-            int x = radarLeft + Math.round(i * spacing);
-            gg.fill(x, radarTop, x + 1, radarTop + radarSize, gridArg);
+        int h = 5, t = h * 2;
+        float sp = rs / (float) t;
+        int ga = (int) (0.1f * slot.alpha / 255f * 255);
+        int gr = (ga << 24) | (gc & 0xFFFFFF);
+        for (int i = 0; i <= t; i++) {
+            int x = rl + Math.round(i * sp);
+            gg.fill(x, rt, x + 1, rt + rs, gr);
         }
-        for (int i = 0; i <= totalCells; i++) {
-            int y = radarTop + Math.round(i * spacing);
-            gg.fill(radarLeft, y, radarLeft + radarSize, y + 1, gridArg);
+        for (int i = 0; i <= t; i++) {
+            int y = rt + Math.round(i * sp);
+            gg.fill(rl, y, rl + rs, y + 1, gr);
         }
-        int cx = radarLeft + radarSize / 2;
-        int cy = radarTop + radarSize / 2;
-        gg.fill(cx, radarTop, cx + 1, radarTop + radarSize, gridArg);
-        gg.fill(radarLeft, cy, radarLeft + radarSize, cy + 1, gridArg);
+        int cx = rl + rs / 2, cy = rt + rs / 2;
+        gg.fill(cx, rt, cx + 1, rt + rs, gr);
+        gg.fill(rl, cy, rl + rs, cy + 1, gr);
 
-        // 圆形黑色底
         mc.getTextureManager().getTexture(TEX_FILLER).setFilter(false, false);
-        float aBg = ALPHA_BACKGROUND * slot.alpha / 255f;
-        gg.setColor(0f, 0f, 0f, aBg);
-        gg.blit(TEX_FILLER, radarLeft, radarTop, radarSize, radarSize, 0, 0, RADAR_TEXTURE_SIZE, RADAR_TEXTURE_SIZE, RADAR_TEXTURE_SIZE, RADAR_TEXTURE_SIZE);
-        gg.setColor(1f, 1f, 1f, 1f);
+        gg.setColor(0, 0, 0, 0.6f * slot.alpha / 255f);
+        gg.blit(TEX_FILLER, rl, rt, rs, rs, 0, 0, 128, 128, 128, 128);
+        gg.setColor(1, 1, 1, 1);
 
-        // 圆形边框
         mc.getTextureManager().getTexture(TEX_CIRCLE).setFilter(false, false);
-        float aCircle = ALPHA_BACKGROUND * 0.5f * slot.alpha / 255f;
-        gg.setColor(0f, 1f, 0f, aCircle);
-        gg.blit(TEX_CIRCLE, radarLeft, radarTop, radarSize, radarSize, 0, 0, RADAR_TEXTURE_SIZE, RADAR_TEXTURE_SIZE, RADAR_TEXTURE_SIZE, RADAR_TEXTURE_SIZE);
-        gg.setColor(1f, 1f, 1f, 1f);
+        gg.setColor(0, 1, 0, 0.3f * slot.alpha / 255f);
+        gg.blit(TEX_CIRCLE, rl, rt, rs, rs, 0, 0, 128, 128, 128, 128);
+        gg.setColor(1, 1, 1, 1);
 
-        // 十字线
-        int lineColor = (int)(slot.alpha * 0.4f) << 24 | (gridColor & 0xFFFFFF);
-        gg.fill(cx, radarTop, cx + 1, radarTop + radarSize, lineColor);
-        gg.fill(radarLeft, cy, radarLeft + radarSize, cy + 1, lineColor);
+        int lc = (int) (slot.alpha * 0.4f) << 24 | (gc & 0xFFFFFF);
+        gg.fill(cx, rt, cx + 1, rt + rs, lc);
+        gg.fill(rl, cy, rl + rs, cy + 1, lc);
 
-        // 扫描线
         mc.getTextureManager().getTexture(TEX_SWEEP).setFilter(false, false);
-        float playerYaw = mc.player != null ? mc.player.getYRot() : 0f;
-        float sweepAngle = (playerYaw + globalAngle) % 360f;
-        if (sweepAngle < 0) sweepAngle += 360;
-        gg.setColor(0f, 204f/255f, 0f, ALPHA_SWEEP * slot.alpha / 255f);
+        float pY = mc.player != null ? mc.player.getYRot() : 0;
+        float sw = (pY + gAngle) % 360;
+        if (sw < 0) sw += 360;
+        gg.setColor(0, 0.8f, 0, 0.8f * slot.alpha / 255f);
         gg.pose().pushPose();
         gg.pose().translate(cx, cy, 0);
-        gg.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-sweepAngle));
+        gg.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(-sw));
         gg.pose().translate(-cx, -cy, 0);
-        gg.blit(TEX_SWEEP, radarLeft, radarTop, radarSize, radarSize, 0, 0, RADAR_TEXTURE_SIZE, RADAR_TEXTURE_SIZE, RADAR_TEXTURE_SIZE, RADAR_TEXTURE_SIZE);
+        gg.blit(TEX_SWEEP, rl, rt, rs, rs, 0, 0, 128, 128, 128, 128);
         gg.pose().popPose();
-        gg.setColor(1f, 1f, 1f, 1f);
+        gg.setColor(1, 1, 1, 1);
 
-        // 目标标记
         if (tracks != null && !tracks.isEmpty()) {
-            float rangeScale = Mth.clamp(50f / Math.max(range, 1f), 0.25f, 2f);
-            int markerSize = Math.round(TRACK_MARKER_BASE_PX * uiScale * rangeScale);
-            markerSize = Math.max(4, markerSize);
-            float uvOff = (TRACK_TEXTURE_SIZE - TRACK_MARKER_SOURCE_PX) * 0.5f;
+            float rs2 = Mth.clamp(50f / Math.max(range, 1f), 0.25f, 2f);
+            int ms = Math.round(18 * 0.4f * rs2);
+            ms = Math.max(4, ms);
+            float uvo = (256 - 16) * 0.5f;
             mc.getTextureManager().getTexture(TEX_ENTITY).setFilter(false, false);
             mc.getTextureManager().getTexture(TEX_PLAYER).setFilter(false, false);
             mc.getTextureManager().getTexture(TEX_CONTRAPTION).setFilter(false, false);
             mc.getTextureManager().getTexture(TEX_PROJECTILE).setFilter(false, false);
-
             for (var track : tracks) {
-                double relX = -(track.x() - radarX);
-                double relZ = track.z() - radarZ;
-                double dist = Math.sqrt(relX * relX + relZ * relZ);
+                double rx = -(track.x() - rX);
+                double rz = track.z() - rZ;
+                double dist = Math.sqrt(rx * rx + rz * rz);
                 if (dist > range) continue;
-
-                float xOff = (float)(relX / range) / 2f * TRACK_POSITION_SCALE;
-                float zOff = (float)(relZ / range) / 2f * TRACK_POSITION_SCALE;
-
-                if (Math.abs(xOff) > 0.5f || Math.abs(zOff) > 0.5f) continue;
-
-                double rad = Math.toRadians(playerYaw);
-                float rx = (float)(xOff * Math.cos(rad) - zOff * Math.sin(rad));
-                float rz = (float)(xOff * Math.sin(rad) + zOff * Math.cos(rad));
-
-                int px = radarLeft + Math.round((0.5f + rx) * radarSize);
-                int pz = radarTop + Math.round((0.5f - rz) * radarSize);
-
-                int col = getTrackColor(track.categoryOrdinal());
+                float xo = (float) (rx / range) / 2f * 0.75f;
+                float zo = (float) (rz / range) / 2f * 0.75f;
+                if (Math.abs(xo) > 0.5f || Math.abs(zo) > 0.5f) continue;
+                double rad = Math.toRadians(pY);
+                float rxx = (float) (xo * Math.cos(rad) - zo * Math.sin(rad));
+                float rzz = (float) (xo * Math.sin(rad) + zo * Math.cos(rad));
+                int px = rl + Math.round((0.5f + rxx) * rs);
+                int py = rt + Math.round((0.5f - rzz) * rs);
+                int col = getTC(track.categoryOrdinal());
                 float tr = ((col >> 16) & 0xFF) / 255f;
                 float tg = ((col >> 8) & 0xFF) / 255f;
                 float tb = (col & 0xFF) / 255f;
-                ResourceLocation tex = switch (track.categoryOrdinal()) {
+                ResourceLocation tx = switch (track.categoryOrdinal()) {
                     case 0 -> TEX_PLAYER;
                     case 5 -> TEX_CONTRAPTION;
                     case 4 -> TEX_PROJECTILE;
                     default -> TEX_ENTITY;
                 };
-                int sx = px - markerSize / 2;
-                int sy = pz - markerSize / 2;
                 gg.setColor(tr, tg, tb, slot.alpha / 255f);
-                gg.blit(tex, sx, sy, markerSize, markerSize, uvOff, uvOff, TRACK_MARKER_SOURCE_PX, TRACK_MARKER_SOURCE_PX, TRACK_TEXTURE_SIZE, TRACK_TEXTURE_SIZE);
-
-                // renderLabel — 玩家显示名字而非 UUID
+                gg.blit(tx, px - ms / 2, py - ms / 2, ms, ms, uvo, uvo, 16, 16, 256, 256);
                 if (track.categoryOrdinal() == 0 && !track.id().isEmpty()) {
-                    gg.setColor(1f, 1f, 1f, 1f);
-                    String label = resolvePlayerName(mc, track.id());
+                    gg.setColor(1, 1, 1, 1);
+                    String lb = resolveName(mc, track.id());
                     gg.pose().pushPose();
-                    gg.pose().translate(px, pz + Math.round(8 * uiScale), 0);
-                    float ls = Math.max(0.5f, uiScale * 1.5f);
-                    gg.pose().scale(ls, ls, 1f);
-                    gg.drawCenteredString(mc.font, label, 0, 0, 0xFFFFFF);
+                    gg.pose().translate(px, py + Math.round(8 * 0.4f), 0);
+                    float ls = Math.max(0.5f, 0.4f * 1.5f);
+                    gg.pose().scale(ls, ls, 1);
+                    gg.drawCenteredString(mc.font, lb, 0, 0, 0xFFFFFF);
                     gg.pose().popPose();
                 }
             }
-            gg.setColor(1f, 1f, 1f, 1f);
+            gg.setColor(1, 1, 1, 1);
         }
-
         RenderSystem.disableBlend();
         gg.pose().popPose();
     }
 
-    private static void drawCircleOutline(GuiGraphics g, int cx, int cy, int r, int color) {
-        int x = 0, y = r, d = 3 - 2 * r;
-        while (x <= y) {
-            g.fill(cx + x, cy + y, cx + x + 1, cy + y + 1, color);
-            g.fill(cx - x, cy + y, cx - x + 1, cy + y + 1, color);
-            g.fill(cx + x, cy - y, cx + x + 1, cy - y + 1, color);
-            g.fill(cx - x, cy - y, cx - x + 1, cy - y + 1, color);
-            g.fill(cx + y, cy + x, cx + y + 1, cy + x + 1, color);
-            g.fill(cx - y, cy + x, cx - y + 1, cy + x + 1, color);
-            g.fill(cx + y, cy - x, cx + y + 1, cy - x + 1, color);
-            g.fill(cx - y, cy - x, cx - y + 1, cy - x + 1, color);
-            if (d < 0) d += 4 * x + 6;
-            else { d += 4 * (x - y) + 10; y--; }
-            x++;
+    private static String resolveName(Minecraft mc, String id) {
+        if (mc.level == null) return id;
+        for (var p : mc.level.players()) {
+            if (p.getStringUUID().equals(id) || p.getName().getString().equals(id))
+                return p.getName().getString();
         }
+        return id.length() > 12 ? id.substring(0, 12) : id;
     }
 
-    /** 尝试将 track id（可能是 UUID）解析为玩家名 */
-    private static String resolvePlayerName(Minecraft mc, String trackId) {
-        if (mc.level == null) return trackId;
-        for (var player : mc.level.players()) {
-            String uuid = player.getStringUUID();
-            String name = player.getName().getString();
-            if (uuid.equals(trackId) || name.equals(trackId)) return name;
-        }
-        // 不是 UUID 也不是名字，直接截断显示
-        return trackId.length() > 12 ? trackId.substring(0, 12) : trackId;
-    }
-
-    private static int getTrackColor(int category) {
-        return switch (category) {
+    private static int getTC(int c) {
+        return switch (c) {
             case 0 -> 0x00FF00;
             case 1, 3 -> 0xFFFF00;
             case 2 -> 0xFF0000;

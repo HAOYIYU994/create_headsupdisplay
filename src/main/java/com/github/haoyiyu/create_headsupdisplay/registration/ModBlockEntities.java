@@ -3,6 +3,7 @@ package com.github.haoyiyu.create_headsupdisplay.registration;
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlockEntity;
+import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalProBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.block.LinkBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.block.OmniCoreBlockEntity;
 import net.minecraft.core.registries.Registries;
@@ -19,6 +20,11 @@ public class ModBlockEntities {
             BLOCK_ENTITIES.register("display_terminal_be",
                     () -> BlockEntityType.Builder.of(DisplayTerminalBlockEntity::new,
                             ModBlocks.DISPLAY_TERMINAL.get()).build(null));
+
+    public static final Supplier<BlockEntityType<DisplayTerminalProBlockEntity>> DISPLAY_TERMINAL_PRO_BE =
+            BLOCK_ENTITIES.register("display_terminal_pro_be",
+                    () -> BlockEntityType.Builder.of(DisplayTerminalProBlockEntity::new,
+                            ModBlocks.DISPLAY_TERMINAL_PRO.get()).build(null));
 
     // 使用 Supplier 统一风格，避免 DeferredHolder 导入问题
     public static final Supplier<BlockEntityType<OmniCoreBlockEntity>> OMNI_CORE =

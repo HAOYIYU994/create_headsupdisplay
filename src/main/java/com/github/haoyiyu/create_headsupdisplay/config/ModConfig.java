@@ -6,26 +6,37 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 
 public class ModConfig {
     public static final ModConfigSpec SERVER_CONFIG;
+    public static final ModConfigSpec CLIENT_CONFIG;
 
     public static final ModConfigSpec.IntValue IMAGE_MAX_SIZE_KB;
     public static final ModConfigSpec.DoubleValue MAX_SCALE;
+    public static final ModConfigSpec.DoubleValue CANVAS_ZOOM;
 
     static {
-        ModConfigSpec.Builder builder = new ModConfigSpec.Builder();
-        builder.push("image");
-        IMAGE_MAX_SIZE_KB = builder
+        ModConfigSpec.Builder serverBuilder = new ModConfigSpec.Builder();
+        serverBuilder.push("image");
+        IMAGE_MAX_SIZE_KB = serverBuilder
                 .comment("Maximum image upload size in kilobytes. Set to 0 to disable image uploads entirely. (default: 512)")
                 .defineInRange("maxSizeKB", 512, 0, 10240);
-        builder.pop();
-        builder.push("display");
-        MAX_SCALE = builder
+        serverBuilder.pop();
+        serverBuilder.push("display");
+        MAX_SCALE = serverBuilder
                 .comment("Maximum scale multiplier for HUD slots. (default: 5.0, range: 0.5 ~ 20.0)")
                 .defineInRange("maxScale", 5.0, 0.5, 20.0);
-        builder.pop();
-        SERVER_CONFIG = builder.build();
+        serverBuilder.pop();
+        SERVER_CONFIG = serverBuilder.build();
+
+        ModConfigSpec.Builder clientBuilder = new ModConfigSpec.Builder();
+        clientBuilder.push("editor");
+        CANVAS_ZOOM = clientBuilder
+                .comment("Canvas zoom level for the Terminal Pro configuration screen. (default: 1.0, range: 0.25 ~ 1.0)")
+                .defineInRange("canvasZoom", 1.0, 0.25, 1.0);
+        clientBuilder.pop();
+        CLIENT_CONFIG = clientBuilder.build();
     }
 
     public static void register(ModContainer container) {
         container.registerConfig(Type.SERVER, SERVER_CONFIG);
+        container.registerConfig(Type.CLIENT, CLIENT_CONFIG);
     }
 }

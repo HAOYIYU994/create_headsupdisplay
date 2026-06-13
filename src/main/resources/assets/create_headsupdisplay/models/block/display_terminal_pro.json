@@ -1,0 +1,10 @@
+{
+  "parent": "create_headsupdisplay:block/display_terminal",
+  "textures": {
+    "1": "create:block/brass_casing",
+    "2": "create:block/railway_casing",
+    "3": "create:block/redstone_bridge_powered",
+    "4": "create:block/flap_display_front",
+    "particle": "create:block/brass_casing"
+  }
+}

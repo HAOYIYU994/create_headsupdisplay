@@ -2,6 +2,7 @@ package com.github.haoyiyu.create_headsupdisplay.network;
 
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlockEntity;
+import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalProBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.block.OmniCoreBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -28,6 +29,12 @@ public record RemoveRadarSlotPayload(BlockPos corePos, int index) implements Cus
             if (be instanceof OmniCoreBlockEntity core) {
                 core.removeRadarSlot(payload.index);
             } else if (be instanceof DisplayTerminalBlockEntity terminal) {
+                if (payload.index >= 0 && payload.index < terminal.getRadarSlots().size()) {
+                    terminal.getRadarSlots().remove(payload.index);
+                    terminal.setChanged();
+                    terminal.syncToBoundPlayers();
+                }
+            } else if (be instanceof DisplayTerminalProBlockEntity terminal) {
                 if (payload.index >= 0 && payload.index < terminal.getRadarSlots().size()) {
                     terminal.getRadarSlots().remove(payload.index);
                     terminal.setChanged();

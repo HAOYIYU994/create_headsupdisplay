@@ -1,4 +1,7 @@
 {
+  "neoforge:conditions": [
+    { "type": "neoforge:mod_loaded", "modid": "create_radar" }
+  ],
   "type": "create:sequenced_assembly",
   "ingredient": {
     "item": "create_headsupdisplay:plugin_base"

@@ -3,6 +3,7 @@ package com.github.haoyiyu.create_headsupdisplay.registration;
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayBlock;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlock;
+import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalProBlock;
 import com.github.haoyiyu.create_headsupdisplay.block.LinkBlock;
 import com.github.haoyiyu.create_headsupdisplay.block.OmniCoreBlock;
 import net.minecraft.world.level.block.Block;
@@ -16,6 +17,9 @@ public class ModBlocks {
 
     public static final DeferredBlock<DisplayTerminalBlock> DISPLAY_TERMINAL = BLOCKS.registerBlock("display_terminal",
             DisplayTerminalBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).requiresCorrectToolForDrops());
+
+    public static final DeferredBlock<DisplayTerminalProBlock> DISPLAY_TERMINAL_PRO = BLOCKS.registerBlock("display_terminal_pro",
+            DisplayTerminalProBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).requiresCorrectToolForDrops());
 
     // 数据集成核心方块
     public static final DeferredBlock<OmniCoreBlock> OMNI_CORE = BLOCKS.registerBlock("omni_core",

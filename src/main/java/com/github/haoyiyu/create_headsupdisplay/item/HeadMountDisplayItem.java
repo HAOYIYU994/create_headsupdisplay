@@ -1,6 +1,7 @@
 package com.github.haoyiyu.create_headsupdisplay.item;
 
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlock;
+import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalProBlock;
 import com.github.haoyiyu.create_headsupdisplay.registration.ModDataComponents;
 import com.simibubi.create.content.equipment.goggles.GogglesItem;
 import net.minecraft.core.BlockPos;
@@ -47,7 +48,8 @@ public class HeadMountDisplayItem extends Item implements Equipable {
         if (player == null || !player.isShiftKeyDown()) return super.useOn(context);
 
         BlockEntity be = level.getBlockEntity(pos);
-        if (be != null && be.getBlockState().getBlock() instanceof DisplayTerminalBlock) {
+        if (be != null && (be.getBlockState().getBlock() instanceof DisplayTerminalBlock
+                || be.getBlockState().getBlock() instanceof DisplayTerminalProBlock)) {
             if (!level.isClientSide) {
                 ItemStack stack = context.getItemInHand();
                 bindTerminal(stack, pos);

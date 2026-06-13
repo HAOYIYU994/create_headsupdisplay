@@ -2,6 +2,7 @@ package com.github.haoyiyu.create_headsupdisplay.network;
 
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlockEntity;
+import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalProBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -34,6 +35,8 @@ public record RemoveImagePayload(BlockPos terminalPos, UUID imageId) implements 
         ctx.enqueueWork(() -> {
             var level = ctx.player().level();
             if (level.getBlockEntity(payload.terminalPos) instanceof DisplayTerminalBlockEntity terminal) {
+                terminal.removeImageSlot(payload.imageId);
+            } else if (level.getBlockEntity(payload.terminalPos) instanceof DisplayTerminalProBlockEntity terminal) {
                 terminal.removeImageSlot(payload.imageId);
             }
         });

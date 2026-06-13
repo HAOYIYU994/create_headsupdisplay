@@ -1,8 +1,10 @@
 package com.github.haoyiyu.create_headsupdisplay.network;
 
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlockEntity;
+import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalProBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.client.ClientHudData;
 import com.github.haoyiyu.create_headsupdisplay.screen.TerminalConfigScreen;
+import com.github.haoyiyu.create_headsupdisplay.screen.TerminalProConfigScreen;
 import net.minecraft.client.Minecraft;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -38,6 +40,15 @@ public class NetworkHandler {
                 })
         );
 
+        // 打开专业版终端配置屏幕（服务端 -> 客户端）
+        registrar.playToClient(
+                OpenTerminalProConfigScreenPayload.TYPE,
+                OpenTerminalProConfigScreenPayload.CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    Minecraft.getInstance().setScreen(new TerminalProConfigScreen(payload.slotsData()));
+                })
+        );
+
         // 更新槽位配置（客户端 -> 服务端）
         registrar.playToServer(
                 UpdateSlotPayload.TYPE,
@@ -46,6 +57,8 @@ public class NetworkHandler {
                     var level = context.player().level();
                     if (level.getBlockEntity(payload.terminalPos()) instanceof DisplayTerminalBlockEntity terminal) {
                         terminal.updateSlotConfig(payload.sourcePos(), payload.posX(), payload.posY(), payload.scale(), payload.rotation(), payload.color(), payload.alpha());
+                    } else if (level.getBlockEntity(payload.terminalPos()) instanceof DisplayTerminalProBlockEntity terminal) {
+                        terminal.updateSlotConfigById(payload.slotId(), payload.sourcePos(), payload.posX(), payload.posY(), payload.scale(), payload.rotation(), payload.color(), payload.alpha());
                     }
                 })
         );
@@ -56,6 +69,8 @@ public class NetworkHandler {
                 (payload, context) -> context.enqueueWork(() -> {
                     var level = context.player().level();
                     if (level.getBlockEntity(payload.terminalPos()) instanceof DisplayTerminalBlockEntity terminal) {
+                        terminal.handleStaticTextUpdate(payload.index(), payload.text(), payload.posX(), payload.posY(), payload.scale(), payload.rotation(), payload.color(), payload.alpha());
+                    } else if (level.getBlockEntity(payload.terminalPos()) instanceof DisplayTerminalProBlockEntity terminal) {
                         terminal.handleStaticTextUpdate(payload.index(), payload.text(), payload.posX(), payload.posY(), payload.scale(), payload.rotation(), payload.color(), payload.alpha());
                     }
                 })
@@ -68,6 +83,8 @@ public class NetworkHandler {
                     var level = context.player().level();
                     if (level.getBlockEntity(payload.terminalPos()) instanceof DisplayTerminalBlockEntity terminal) {
                         terminal.addStaticTextSlot(payload.text(), payload.posX(), payload.posY(), payload.scale(), payload.rotation(), payload.color(), payload.alpha());
+                    } else if (level.getBlockEntity(payload.terminalPos()) instanceof DisplayTerminalProBlockEntity terminal) {
+                        terminal.addStaticTextSlot(payload.text(), payload.posX(), payload.posY(), payload.scale(), payload.rotation(), payload.color(), payload.alpha(), 0);
                     }
                 })
         );
@@ -78,6 +95,8 @@ public class NetworkHandler {
                 (payload, context) -> context.enqueueWork(() -> {
                     var level = context.player().level();
                     if (level.getBlockEntity(payload.terminalPos()) instanceof DisplayTerminalBlockEntity terminal) {
+                        terminal.removeStaticText(payload.index());
+                    } else if (level.getBlockEntity(payload.terminalPos()) instanceof DisplayTerminalProBlockEntity terminal) {
                         terminal.removeStaticText(payload.index());
                     }
                 })
@@ -90,6 +109,20 @@ public class NetworkHandler {
                     var level = context.player().level();
                     if (level.getBlockEntity(payload.terminalPos()) instanceof DisplayTerminalBlockEntity terminal) {
                         terminal.removeSlot(payload.sourcePos());
+                    } else if (level.getBlockEntity(payload.terminalPos()) instanceof DisplayTerminalProBlockEntity terminal) {
+                        terminal.removeSlot(payload.sourcePos());
+                    }
+                })
+        );
+
+        // 坞 X：删槽位+缓存
+        registrar.playToServer(
+                RemoveSlotSourcePayload.TYPE,
+                RemoveSlotSourcePayload.CODEC,
+                (payload, context) -> context.enqueueWork(() -> {
+                    var level = context.player().level();
+                    if (level.getBlockEntity(payload.terminalPos()) instanceof DisplayTerminalProBlockEntity terminal) {
+                        terminal.removeSourceCard(payload.sourcePos());
                     }
                 })
         );
@@ -250,6 +283,13 @@ public class NetworkHandler {
                 SetTerminalNamePayload.TYPE,
                 SetTerminalNamePayload.CODEC,
                 SetTerminalNamePayload::handle
+        );
+
+        // 保存Pro配置（客户端→服务端：图层+全部槽位）
+        registrar.playToServer(
+                SaveProConfigPayload.TYPE,
+                SaveProConfigPayload.CODEC,
+                SaveProConfigPayload::handle
         );
 
         // 请求打开插件槽位（客户端 -> 服务端）

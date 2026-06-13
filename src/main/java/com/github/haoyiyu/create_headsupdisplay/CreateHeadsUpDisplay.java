@@ -1,6 +1,7 @@
 package com.github.haoyiyu.create_headsupdisplay;
 
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalTarget;
+import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalProTarget;
 import com.github.haoyiyu.create_headsupdisplay.block.OmniCoreDisplayTarget;
 import com.github.haoyiyu.create_headsupdisplay.client.HeadMountDisplayClient;
 import com.github.haoyiyu.create_headsupdisplay.config.ModConfig;
@@ -11,6 +12,7 @@ import com.github.haoyiyu.create_headsupdisplay.screen.PluginSlotScreen;
 import com.github.haoyiyu.create_headsupdisplay.registration.*;
 import com.simibubi.create.api.behaviour.display.DisplayTarget;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlockEntity;
+import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalProBlockEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -59,6 +61,7 @@ public class CreateHeadsUpDisplay {
     private void commonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
             DisplayTarget.BY_BLOCK.register(ModBlocks.DISPLAY_TERMINAL.get(), new DisplayTerminalTarget());
+            DisplayTarget.BY_BLOCK.register(ModBlocks.DISPLAY_TERMINAL_PRO.get(), new DisplayTerminalProTarget());
             DisplayTarget.BY_BLOCK.register(ModBlocks.OMNI_CORE.get(), new OmniCoreDisplayTarget());
             // 雷达集成（软依赖，通过反射安全调用）
             // 注意：必须用 Throwable 而非 Exception，因为 NoClassDefFoundError 是 Error 的子类
@@ -107,6 +110,14 @@ public class CreateHeadsUpDisplay {
                 event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.hold_shift",
                         Component.keybind("key.sneak")));
             }
+        } else if (stack.is(ModItems.DISPLAY_TERMINAL_PRO_ITEM.get())) {
+            if (isShiftHeld) {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.display_terminal_pro.line1"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.display_terminal_pro.line2"));
+            } else {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.hold_shift",
+                        Component.keybind("key.sneak")));
+            }
         } else if (stack.is(ModItems.RADAR_PLUGIN.get())) {
             if (isShiftHeld) {
                 event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.radar_plugin.line1"));
@@ -128,6 +139,8 @@ public class CreateHeadsUpDisplay {
                 playerPos.offset(-range, -range, -range),
                 playerPos.offset(range, range, range))) {
             if (level.getBlockEntity(p) instanceof DisplayTerminalBlockEntity terminal) {
+                terminal.syncToBoundPlayers();
+            } else if (level.getBlockEntity(p) instanceof DisplayTerminalProBlockEntity terminal) {
                 terminal.syncToBoundPlayers();
             }
         }

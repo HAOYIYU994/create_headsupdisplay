@@ -21,6 +21,9 @@ public class ModItems {
     public static final DeferredItem<BlockItem> DISPLAY_TERMINAL_ITEM = ITEMS.register("display_terminal",
             () -> new BlockItem(ModBlocks.DISPLAY_TERMINAL.get(), new Item.Properties()));
 
+    public static final DeferredItem<BlockItem> DISPLAY_TERMINAL_PRO_ITEM = ITEMS.register("display_terminal_pro",
+            () -> new BlockItem(ModBlocks.DISPLAY_TERMINAL_PRO.get(), new Item.Properties()));
+
     // 新增 OmniCore 物品
     public static final DeferredItem<OmniCoreItem> OMNI_CORE_ITEM = ITEMS.register("omni_core",
             () -> new OmniCoreItem(ModBlocks.OMNI_CORE.get(), new Item.Properties()));

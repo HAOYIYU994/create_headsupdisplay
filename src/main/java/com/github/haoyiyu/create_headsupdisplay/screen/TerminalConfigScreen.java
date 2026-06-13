@@ -132,7 +132,7 @@ public class TerminalConfigScreen extends Screen {
 
     private void saveChanges() {
         for (SlotEntry slot : slots) {
-            PacketDistributor.sendToServer(new UpdateSlotPayload(terminalPos, slot.sourcePos, slot.posX, slot.posY, slot.scale, slot.rotation, slot.color, slot.alpha));
+            PacketDistributor.sendToServer(new UpdateSlotPayload(terminalPos, slot.sourcePos, 0, slot.posX, slot.posY, slot.scale, slot.rotation, slot.color, slot.alpha));
         }
         for (int i = 0; i < staticTexts.size(); i++) {
             StaticTextEntry entry = staticTexts.get(i);

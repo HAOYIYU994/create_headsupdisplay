@@ -4,6 +4,7 @@ import com.github.haoyiyu.create_headsupdisplay.block.LinkBlock;
 import com.github.haoyiyu.create_headsupdisplay.block.LinkBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.block.OmniCoreBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlock;
+import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalProBlock;
 import com.github.haoyiyu.create_headsupdisplay.registration.ModBlocks;
 import com.github.haoyiyu.create_headsupdisplay.registration.ModDataComponents;
 import net.minecraft.core.BlockPos;
@@ -59,7 +60,8 @@ public class LinkBlockItem extends BlockItem {
         }
 
         // 有已存核心坐标：右键终端或监视器
-        boolean isTerminal = level.getBlockState(clickedPos).getBlock() instanceof DisplayTerminalBlock;
+        boolean isTerminal = level.getBlockState(clickedPos).getBlock() instanceof DisplayTerminalBlock
+                || level.getBlockState(clickedPos).getBlock() instanceof DisplayTerminalProBlock;
         boolean isMonitor = isRadarMonitor(level.getBlockEntity(clickedPos));
 
         if (!isTerminal && !isMonitor) {
