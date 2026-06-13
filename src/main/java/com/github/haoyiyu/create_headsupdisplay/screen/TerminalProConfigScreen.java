@@ -833,11 +833,11 @@ public class TerminalProConfigScreen extends Screen {
             return true;
         }
         x += lw + 4;
-        x += 1; // separator
-        x += 5; // gap
+        x += 5; // separator 1
+        x += 5; // separator 2
 
         // Aa btn
-        int aw = font.width("Aa") + 8;
+        int aw = font.width(t("gui.create_headsupdisplay.pro.tool_text")) + 8;
         if (mx >= x && mx <= x + aw && my >= 0 && my <= menuH) {
             playClick();
             StaticTextEntry e = new StaticTextEntry(t("gui.create_headsupdisplay.pro.new_text"), width / 2, height / 2);
@@ -850,7 +850,7 @@ public class TerminalProConfigScreen extends Screen {
         x += aw + 2;
 
         // Mode btn
-        String ml = selectedElement instanceof SlotEntry ? modeName(((SlotEntry)selectedElement).displayMode) : "Mode";
+        String ml = selectedElement instanceof SlotEntry ? modeName(((SlotEntry)selectedElement).displayMode) : t("gui.create_headsupdisplay.pro.tool_mode");
         int mw = font.width(ml) + 8;
         if (mx >= x && mx <= x + mw && my >= 0 && my <= menuH && selectedElement instanceof SlotEntry se) {
             playClick();
@@ -860,7 +860,7 @@ public class TerminalProConfigScreen extends Screen {
         x += mw + 2;
 
         // Color btn
-        int cw = font.width("🎨") + 8;
+        int cw = font.width(t("gui.create_headsupdisplay.pro.tool_color")) + 8;
         if (mx >= x && mx <= x + cw && my >= 0 && my <= menuH && selectedElement != null) {
             playClick();
             int c = getElementColor(selectedElement);
@@ -871,7 +871,7 @@ public class TerminalProConfigScreen extends Screen {
         x += cw + 2;
 
         // Anim btn
-        int animW = font.width("▶") + 8;
+        int animW = font.width(t("gui.create_headsupdisplay.pro.tool_anim")) + 8;
         if (mx >= x && mx <= x + animW && my >= 0 && my <= menuH && selectedElement instanceof SlotEntry se) {
             playClick();
             animPanel.show(width / 2 - 150, 40, se.animations);
@@ -880,7 +880,7 @@ public class TerminalProConfigScreen extends Screen {
         x += animW + 2;
 
         // Delete btn
-        int dw = font.width("🗑") + 8;
+        int dw = font.width(t("gui.create_headsupdisplay.pro.tool_delete")) + 8;
         if (mx >= x && mx <= x + dw && my >= 0 && my <= menuH) {
             playClick();
             if (selectedElement != null) { deleteElement(selectedElement); selectedElement = null; }
@@ -890,7 +890,7 @@ public class TerminalProConfigScreen extends Screen {
         x += 4;  // gap
 
         // Save btn
-        int saveW = font.width("💾") + 8;
+        int saveW = font.width(t("gui.create_headsupdisplay.pro.tool_save")) + 8;
         if (mx >= x && mx <= x + saveW && my >= 0 && my <= menuH) {
             playClick();
             saveAll();
