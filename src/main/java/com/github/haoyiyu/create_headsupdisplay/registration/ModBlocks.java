@@ -1,6 +1,8 @@
 package com.github.haoyiyu.create_headsupdisplay.registration;
 
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
+import com.github.haoyiyu.create_headsupdisplay.block.FastDisplayLinkBlock;
+import com.github.haoyiyu.create_headsupdisplay.block.NbtReaderBlock;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayBlock;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlock;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalProBlock;
@@ -32,6 +34,12 @@ public class ModBlocks {
     public static final DeferredBlock<DisplayBlock> DISPLAY = BLOCKS.registerBlock("display",
             DisplayBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).noOcclusion()
                     .lightLevel(s -> 8));
+
+    public static final DeferredBlock<NbtReaderBlock> NBT_READER = BLOCKS.registerBlock("nbt_reader",
+            NbtReaderBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f));
+
+    public static final DeferredBlock<FastDisplayLinkBlock> FAST_DISPLAY_LINK = BLOCKS.registerBlock("fast_display_link",
+            FastDisplayLinkBlock::new, BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(2.0f).noOcclusion());
 
     public static void register(net.neoforged.bus.api.IEventBus bus) {
         BLOCKS.register(bus);

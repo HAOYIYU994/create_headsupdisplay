@@ -33,6 +33,13 @@ public class ModDataComponents {
                             .networkSynchronized(BlockPos.STREAM_CODEC)
                             .build());
 
+    public static final Supplier<DataComponentType<BlockPos>> LINKED_PROBE_POS =
+            DATA_COMPONENTS.register("linked_probe_pos",
+                    () -> DataComponentType.<BlockPos>builder()
+                            .persistent(BlockPos.CODEC)
+                            .networkSynchronized(BlockPos.STREAM_CODEC)
+                            .build());
+
     public static void register(IEventBus bus) {
         DATA_COMPONENTS.register(bus);
     }

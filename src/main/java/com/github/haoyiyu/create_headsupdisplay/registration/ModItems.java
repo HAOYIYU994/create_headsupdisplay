@@ -6,6 +6,7 @@ import com.github.haoyiyu.create_headsupdisplay.item.ImagePluginItem;
 import com.github.haoyiyu.create_headsupdisplay.item.LinkBlockItem;
 import com.github.haoyiyu.create_headsupdisplay.item.OmniCoreItem;
 import com.github.haoyiyu.create_headsupdisplay.item.PluginBaseItem;
+import com.github.haoyiyu.create_headsupdisplay.item.FastDisplayLinkBlockItem;
 import com.github.haoyiyu.create_headsupdisplay.item.RadarPluginItem;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
@@ -42,6 +43,12 @@ public class ModItems {
 
     public static final DeferredItem<PluginBaseItem> PLUGIN_BASE = ITEMS.register("plugin_base",
             () -> new PluginBaseItem(new Item.Properties().stacksTo(64)));
+
+    public static final DeferredItem<BlockItem> NBT_READER_ITEM = ITEMS.register("nbt_reader",
+            () -> new BlockItem(ModBlocks.NBT_READER.get(), new Item.Properties()));
+
+    public static final DeferredItem<BlockItem> FAST_DISPLAY_LINK_ITEM = ITEMS.register("fast_display_link",
+            FastDisplayLinkBlockItem::new);
 
     public static void register(net.neoforged.bus.api.IEventBus bus) {
         ITEMS.register(bus);

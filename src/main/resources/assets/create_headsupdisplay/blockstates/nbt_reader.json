@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "facing=down":  { "model": "create_headsupdisplay:block/nbt_reader", "x": 180 },
+    "facing=up":    { "model": "create_headsupdisplay:block/nbt_reader" },
+    "facing=north": { "model": "create_headsupdisplay:block/nbt_reader", "x": 90 },
+    "facing=south": { "model": "create_headsupdisplay:block/nbt_reader", "x": 90, "y": 180 },
+    "facing=west":  { "model": "create_headsupdisplay:block/nbt_reader", "x": 90, "y": 270 },
+    "facing=east":  { "model": "create_headsupdisplay:block/nbt_reader", "x": 90, "y": 90 }
+  }
+}

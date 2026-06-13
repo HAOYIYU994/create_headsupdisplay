@@ -299,5 +299,17 @@ public class NetworkHandler {
                 RequestOpenPluginSlotsPayload::handle
         );
 
+        // ========== NbtReader 网络包 ==========
+        registrar.playToClient(
+                OpenNbtReaderScreenPayload.TYPE,
+                OpenNbtReaderScreenPayload.CODEC,
+                OpenNbtReaderScreenPayload::handle
+        );
+        registrar.playToServer(
+                UpdateNbtReaderConfigPayload.TYPE,
+                UpdateNbtReaderConfigPayload.CODEC,
+                UpdateNbtReaderConfigPayload::handle
+        );
+
     }
 }

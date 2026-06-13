@@ -93,8 +93,8 @@ dependencies {
         compileOnly files(radarFiles)
         println "  [HUD] Create Radar found, radar integration enabled"
     } else {
-        // 没有雷达 jar 时排除集成代码，确保编译通过
-        sourceSets.main.java.exclude 'com/github/haoyiyu/create_headsupdisplay/integration/**'
+        sourceSets.main.java.exclude 'com/github/haoyiyu/create_headsupdisplay/integration/RadarIntegration.java'
+        sourceSets.main.java.exclude 'com/github/haoyiyu/create_headsupdisplay/integration/OmniCoreRadarBehavior.java'
         println "  [HUD] Create Radar not found, radar integration disabled"
     }
 }

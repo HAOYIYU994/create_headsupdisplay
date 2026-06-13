@@ -118,6 +118,13 @@ public class CreateHeadsUpDisplay {
                 event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.hold_shift",
                         Component.keybind("key.sneak")));
             }
+        } else if (stack.is(ModItems.FAST_DISPLAY_LINK_ITEM.get())) {
+            if (isShiftHeld) {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.fast_display_link.line1"));
+            } else {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.hold_shift",
+                        Component.keybind("key.sneak")));
+            }
         } else if (stack.is(ModItems.RADAR_PLUGIN.get())) {
             if (isShiftHeld) {
                 event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.radar_plugin.line1"));

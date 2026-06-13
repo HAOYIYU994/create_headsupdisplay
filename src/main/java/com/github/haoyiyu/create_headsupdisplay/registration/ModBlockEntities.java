@@ -1,6 +1,8 @@
 package com.github.haoyiyu.create_headsupdisplay.registration;
 
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
+import com.github.haoyiyu.create_headsupdisplay.block.FastDisplayLinkBlockEntity;
+import com.github.haoyiyu.create_headsupdisplay.block.NbtReaderBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalProBlockEntity;
@@ -38,6 +40,15 @@ public class ModBlockEntities {
     public static final Supplier<BlockEntityType<DisplayBlockEntity>> DISPLAY =
             BLOCK_ENTITIES.register("display", () -> BlockEntityType.Builder.of(DisplayBlockEntity::new,
                     ModBlocks.DISPLAY.get()).build(null));
+
+    public static final Supplier<BlockEntityType<NbtReaderBlockEntity>> NBT_READER =
+            BLOCK_ENTITIES.register("nbt_reader", () -> BlockEntityType.Builder.of(NbtReaderBlockEntity::new,
+                    ModBlocks.NBT_READER.get()).build(null));
+
+    public static final Supplier<BlockEntityType<FastDisplayLinkBlockEntity>> FAST_DISPLAY_LINK =
+            BLOCK_ENTITIES.register("fast_display_link", () -> BlockEntityType.Builder.of(
+                    FastDisplayLinkBlockEntity::new,
+                    ModBlocks.FAST_DISPLAY_LINK.get()).build(null));
 
     public static void register(net.neoforged.bus.api.IEventBus bus) {
         BLOCK_ENTITIES.register(bus);

@@ -37,6 +37,7 @@ public record RequestSourcesDataPayload(BlockPos corePos) implements CustomPacke
                         var src = core.getSource(i);
                         CompoundTag tag = new CompoundTag();
                         tag.putString("type", src.sourceType());
+                        tag.putBoolean("system", src.systemSource());
                         tag.putString("name", src.name());
                         tag.putInt("strength", src.strength());
                         tag.putString("display", src.displayText());

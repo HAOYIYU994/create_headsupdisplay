@@ -65,7 +65,7 @@ public class OmniCoreBlock extends HorizontalDirectionalBlock implements EntityB
 
     @Override
     protected net.minecraft.world.ItemInteractionResult useItemOn(ItemStack stack, BlockState state, Level level, BlockPos pos, Player player, InteractionHand hand, BlockHitResult hitResult) {
-        if (stack.getItem() instanceof LinkBlockItem) {
+        if (stack.getItem() instanceof LinkBlockItem || stack.getItem() instanceof com.github.haoyiyu.create_headsupdisplay.item.PluginBaseItem) {
             return net.minecraft.world.ItemInteractionResult.SKIP_DEFAULT_BLOCK_INTERACTION;
         }
         return net.minecraft.world.ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;

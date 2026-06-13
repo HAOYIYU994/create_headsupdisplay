@@ -62,6 +62,71 @@ public class OmniCoreBlockEntity extends BlockEntity {
         @Override public void setChanged() { OmniCoreBlockEntity.this.setChanged(); }
     };
 
+    /** 每 tick 扫描插件槽中的 DataProbe 底板，拉取读取值并更新 PROBE 源 */
+    private void pollProbesFromPlugins() {
+        java.util.Set<BlockPos> seenProbes = new java.util.HashSet<>();
+        for (int i = 0; i < pluginInventory.getContainerSize(); i++) {
+            ItemStack stack = pluginInventory.getItem(i);
+            if (stack.isEmpty()) continue;
+            BlockPos probePos = stack.get(com.github.haoyiyu.create_headsupdisplay.registration.ModDataComponents.LINKED_PROBE_POS.get());
+            if (probePos == null) continue;
+            seenProbes.add(probePos);
+
+            BlockEntity probeBe = level.getBlockEntity(probePos);
+            if (!(probeBe instanceof NbtReaderBlockEntity probe)) continue;
+            if (probe.getSelectedChannelId().isEmpty()) continue;
+
+            String value = probe.readValue();
+            String name = probe.getProbeName();
+            // 找到或创建 PROBE 源
+            RedstoneSource existing = null;
+            for (RedstoneSource src : sources) {
+                if (src.sourceType == RedstoneSource.Type.PROBE && probePos.equals(src.probeSourcePos)) {
+                    existing = src;
+                    break;
+                }
+            }
+            if (existing != null) {
+                if (!value.equals(existing.probeValue)) {
+                    existing.probeValue = value;
+                    existing.name = name;
+                    existing.lastSentText = value;
+                    setChanged();
+                    sendProbeToTerminals(sources.indexOf(existing));
+                }
+            } else {
+                // 添加新 PROBE 源
+                RedstoneSource src = RedstoneSource.probe(probePos, name, value);
+                assignSourceId(src);
+                sources.add(0, src);
+                remapSentAfterInsert();
+                setChanged();
+                sendProbeToTerminals(0);
+            }
+        }
+
+        // 清理已拔出插件的 PROBE 源
+        var toRemove = new java.util.ArrayList<Integer>();
+        for (int i = 0; i < sources.size(); i++) {
+            RedstoneSource src = sources.get(i);
+            if (src.sourceType == RedstoneSource.Type.PROBE && !seenProbes.contains(src.probeSourcePos)) {
+                toRemove.add(i);
+            }
+        }
+        for (int j = toRemove.size() - 1; j >= 0; j--) {
+            removeRedstoneSource(toRemove.get(j));
+        }
+    }
+
+    /** 新源插入列表顶部后重映射 sentSources */
+    private void remapSentAfterInsert() {
+        java.util.Map<Integer, BlockPos> remapped = new java.util.HashMap<>();
+        for (var entry : sentSources.entrySet()) {
+            remapped.put(entry.getKey() + 1, entry.getValue());
+        }
+        sentSources = remapped;
+    }
+
     public boolean hasImagePlugin() {
         for (int i = 0; i < pluginInventory.getContainerSize(); i++)
             if (pluginInventory.getItem(i).getItem() instanceof com.github.haoyiyu.create_headsupdisplay.item.ImagePluginItem)
@@ -231,6 +296,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
             for (RedstoneSource src : sources) {
                 CompoundTag srcTag = new CompoundTag();
                 srcTag.putString("type", src.sourceType.name());
+                srcTag.putBoolean("system", src.systemSource);
                 srcTag.putString("name", src.name);
                 srcTag.put("freqItem1", src.frequencyItem1.saveOptional(level.registryAccess()));
                 srcTag.put("freqItem2", src.frequencyItem2.saveOptional(level.registryAccess()));
@@ -520,27 +586,112 @@ public class OmniCoreBlockEntity extends BlockEntity {
         setChanged();
     }
 
+    /** DataProbe 推送数据时添加或更新源，数值变化时自动置顶 */
+    public void addOrUpdateProbeSource(BlockPos probePos, String name, String value) {
+        for (int i = 0; i < sources.size(); i++) {
+            RedstoneSource src = sources.get(i);
+            if (src.sourceType == RedstoneSource.Type.PROBE
+                    && probePos.equals(src.probeSourcePos)) {
+                if (!value.equals(src.probeValue)) {
+                    src.probeValue = value;
+                    src.name = name;
+                    if (autoSortEnabled) moveToTop(i);
+                }
+                setChanged();
+                // 自动推送到已绑定的终端（已发送过的）
+                sendProbeToTerminals(i);
+                return;
+            }
+        }
+        RedstoneSource src = RedstoneSource.probe(probePos, name, value);
+        assignSourceId(src);
+        sources.add(0, src);
+        // 重映射 sentSources
+        Map<Integer, BlockPos> remapped = new HashMap<>();
+        for (var entry : sentSources.entrySet()) {
+            remapped.put(entry.getKey() + 1, entry.getValue());
+        }
+        sentSources = remapped;
+        setChanged();
+        // 新源自动推送到所有终端
+        sendProbeToTerminals(0);
+    }
+
+    /** 将 PROBE 源的当前值推送到所有已绑定的终端 */
+    private void sendProbeToTerminals(int sourceIndex) {
+        if (sourceIndex < 0 || sourceIndex >= sources.size()) return;
+        RedstoneSource src = sources.get(sourceIndex);
+        if (src.sourceType != RedstoneSource.Type.PROBE) return;
+        String displayText = src.probeValue != null ? src.probeValue : "0";
+        String cleanName = src.name.replaceAll("§[0-9a-fk-or]", "");
+        BlockPos virtualPos = new BlockPos(src.sourceId, 0, 0);
+
+        for (BlockPos tp : boundTerminals) {
+            BlockEntity be = level.getBlockEntity(tp);
+            if (be instanceof DisplayTerminalBlockEntity terminal) {
+                if (terminal.getSlotBySourceName(cleanName) == null) {
+                    terminal.updateSlotConfig(virtualPos,
+                            10, 50 + sentSources.size() * 20,
+                            1.0f, 0f, 0xFFFFFF, 255);
+                }
+                terminal.updateSlotData(virtualPos, displayText);
+                terminal.updateSlotSourceName(virtualPos, cleanName);
+            } else if (be instanceof DisplayTerminalProBlockEntity terminalPro) {
+                terminalPro.getSourceCache().put(virtualPos, displayText);
+                terminalPro.getSourceNameCache().put(virtualPos, cleanName);
+                if (terminalPro.findSlot(virtualPos) != null) {
+                    terminalPro.updateSlotDataAndStyle(virtualPos, displayText, 0, cleanName);
+                }
+                terminalPro.setChanged();
+                terminalPro.syncToBoundPlayers();
+            }
+        }
+        sentSources.put(sourceIndex, virtualPos);
+        setChanged();
+    }
+
+    /** 移除指定 DataProbe 创建的所有源（Probe 被拆除时调用） */
+    public void removeProbeSource(BlockPos probePos) {
+        var toRemove = new ArrayList<Integer>();
+        for (int i = 0; i < sources.size(); i++) {
+            RedstoneSource src = sources.get(i);
+            if (src.sourceType == RedstoneSource.Type.PROBE && probePos.equals(src.probeSourcePos)) {
+                toRemove.add(i);
+            }
+        }
+        // 从后往前删，避免索引错位
+        for (int j = toRemove.size() - 1; j >= 0; j--) {
+            removeRedstoneSource(toRemove.get(j));
+        }
+    }
+
     /** 供 RequestSourcesDataPayload 读取源数据，返回不可变快照 */
     public SourceSnapshot getSource(int index) {
         RedstoneSource src = sources.get(index);
         int strength = getCurrentStrength(src);
-        // DisplayLink 源：用实际文本而非强度值；红石源：用转译后的文本
+        // DisplayLink/Probe/Physics 源：用实际文本而非强度值；红石源：用转译后的文本
         String display;
         if (src.sourceType == RedstoneSource.Type.DISPLAY_LINK) {
             display = src.displayLinkText != null ? src.displayLinkText : "0";
+        } else if (src.sourceType == RedstoneSource.Type.PROBE || src.sourceType == RedstoneSource.Type.PHYSICS) {
+            display = src.probeValue != null ? src.probeValue : "0";
         } else {
             display = getDisplayText(src);
         }
+        BlockPos sourcePos = src.sourceType == RedstoneSource.Type.PROBE
+                ? src.probeSourcePos : src.displayLinkSourcePos;
         return new SourceSnapshot(src.name, src.frequencyItem1, src.frequencyItem2,
-                strength, display, src.displayLinkSourcePos,
-                src.sourceType.name(), src.imageId, src.imageFileName, src.imageData);
+                strength, display, sourcePos,
+                src.sourceType.name(), src.imageId, src.imageFileName, src.imageData,
+                src.systemSource);
     }
 
     public record SourceSnapshot(String name, net.minecraft.world.item.ItemStack item1,
                                   net.minecraft.world.item.ItemStack item2, int strength,
                                   String displayText, BlockPos displayLinkSourcePos,
                                   String sourceType, UUID imageId,
-                                  String imageFileName, byte[] imageData) {}
+                                  String imageFileName, byte[] imageData,
+                                  boolean systemSource) {}
 
     /** @param terminalIndex -1 = 所有终端，>=0 = 指定索引 */
     public void sendToTerminal(int sourceIndex, int terminalIndex) {
@@ -609,7 +760,12 @@ public class OmniCoreBlockEntity extends BlockEntity {
 
         BlockPos virtualPos = new BlockPos(src.sourceId, 0, 0); // 稳定的数字编码
 
-        String displayText = src.displayLinkText != null ? src.displayLinkText : getDisplayText(src);
+        String displayText;
+        if (src.sourceType == RedstoneSource.Type.PROBE || src.sourceType == RedstoneSource.Type.PHYSICS) {
+            displayText = src.probeValue != null ? src.probeValue : "0";
+        } else {
+            displayText = src.displayLinkText != null ? src.displayLinkText : getDisplayText(src);
+        }
         String cleanName = src.name.replaceAll("§[0-9a-fk-or]", "");
 
         for (BlockPos tp : targets) {
@@ -664,6 +820,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
     }
 
     private int getCurrentStrength(RedstoneSource src) {
+        if (src.sourceType == RedstoneSource.Type.PROBE || src.sourceType == RedstoneSource.Type.PHYSICS) return 0;
         if (src.displayLinkSourcePos != null) return 0;
         return RedstoneSignalHelper.getSignalStrength(level, src.frequencyItem1, src.frequencyItem2);
     }
@@ -732,6 +889,9 @@ public class OmniCoreBlockEntity extends BlockEntity {
         if (be.linkedMonitorPos != null) {
             be.syncRadarTracks();
         }
+
+        // 插件槽 DataProbe 轮询
+        be.pollProbesFromPlugins();
 
         // 第一步：检测所有源的变化，变化时置顶（不需要绑定终端）
         for (int idx = 0; idx < be.sources.size(); idx++) {
@@ -809,6 +969,8 @@ public class OmniCoreBlockEntity extends BlockEntity {
             String newText = null;
             if (src.sourceType == RedstoneSource.Type.DISPLAY_LINK) {
                 newText = src.displayLinkText;
+            } else if (src.sourceType == RedstoneSource.Type.PROBE || src.sourceType == RedstoneSource.Type.PHYSICS) {
+                newText = src.probeValue;
             } else if (src.sourceType == RedstoneSource.Type.REDSTONE) {
                 newText = be.getDisplayText(src);
             }
@@ -889,6 +1051,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
         for (RedstoneSource src : sources) {
             CompoundTag srcTag = new CompoundTag();
             srcTag.putString("type", src.sourceType.name());
+            srcTag.putBoolean("system", src.systemSource);
             srcTag.putInt("sourceId", src.sourceId);
             srcTag.putString("name", src.name);
             srcTag.put("freqItem1", src.frequencyItem1.saveOptional(registries));
@@ -906,6 +1069,10 @@ public class OmniCoreBlockEntity extends BlockEntity {
                 srcTag.putUUID("ImageId", src.imageId);
                 srcTag.putString("ImageFileName", src.imageFileName);
                 srcTag.putByteArray("ImageData", src.imageData);
+            }
+            if (src.sourceType == RedstoneSource.Type.PROBE) {
+                if (src.probeSourcePos != null) srcTag.putLong("ProbePos", src.probeSourcePos.asLong());
+                if (src.probeValue != null) srcTag.putString("ProbeValue", src.probeValue);
             }
             sourcesTag.add(srcTag);
         }
@@ -972,6 +1139,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
                 try { src.sourceType = RedstoneSource.Type.valueOf(srcTag.getString("type")); }
                 catch (IllegalArgumentException e) { src.sourceType = RedstoneSource.Type.REDSTONE; }
             }
+            src.systemSource = srcTag.getBoolean("system");
             if (srcTag.contains("dlSourcePos")) {
                 src.displayLinkSourcePos = BlockPos.of(srcTag.getLong("dlSourcePos"));
             }
@@ -985,6 +1153,10 @@ public class OmniCoreBlockEntity extends BlockEntity {
                 src.imageId = srcTag.getUUID("ImageId");
                 src.imageFileName = srcTag.getString("ImageFileName");
                 src.imageData = srcTag.getByteArray("ImageData");
+            }
+            if (src.sourceType == RedstoneSource.Type.PROBE) {
+                if (srcTag.contains("ProbePos")) src.probeSourcePos = BlockPos.of(srcTag.getLong("ProbePos"));
+                src.probeValue = srcTag.getString("ProbeValue");
             }
             sources.add(src);
         }
@@ -1027,10 +1199,11 @@ public class OmniCoreBlockEntity extends BlockEntity {
     }
 
     private static class RedstoneSource {
-        enum Type { REDSTONE, DISPLAY_LINK, IMAGE, RADAR }
+        enum Type { REDSTONE, DISPLAY_LINK, IMAGE, RADAR, PROBE, PHYSICS }
 
         Type sourceType = Type.REDSTONE;
         String name;
+        boolean systemSource; // 系统自动生成，不可删除
         ItemStack frequencyItem1;
         ItemStack frequencyItem2;
         int lastStrength = -1;
@@ -1044,6 +1217,10 @@ public class OmniCoreBlockEntity extends BlockEntity {
         UUID imageId;
         String imageFileName;
         byte[] imageData;
+
+        // PROBE 类型专用字段
+        BlockPos probeSourcePos;
+        String probeValue;
 
         int sourceId; // 固定的数字编码，不随名称变化
 
@@ -1060,6 +1237,15 @@ public class OmniCoreBlockEntity extends BlockEntity {
             src.imageId = imageId;
             src.imageFileName = fileName;
             src.imageData = data;
+            return src;
+        }
+
+        /** 创建一个 PROBE 类型的源 */
+        static RedstoneSource probe(BlockPos probePos, String name, String value) {
+            RedstoneSource src = new RedstoneSource(name, ItemStack.EMPTY, ItemStack.EMPTY);
+            src.sourceType = Type.PROBE;
+            src.probeSourcePos = probePos;
+            src.probeValue = value;
             return src;
         }
     }
