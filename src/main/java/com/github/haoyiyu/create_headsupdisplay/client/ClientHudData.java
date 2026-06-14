@@ -3,6 +3,8 @@ package com.github.haoyiyu.create_headsupdisplay.client;
 import com.github.haoyiyu.create_headsupdisplay.config.HudPositionConfig;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
@@ -115,11 +117,17 @@ public class ClientHudData {
         public final int color, alpha;
         public final boolean frozen;
         public final java.util.List<com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation> animations;
+        public final ResourceLocation displayModeId;
+        public final com.github.haoyiyu.create_headsupdisplay.api.DisplayModeConfig modeConfig;
+        public final java.util.List<String> dataValues;
 
         public SlotRenderData(BlockPos sourcePos, int posX, int posY, float scale, String text, int displayLine,
                               int displayMode, float displayMax, float displayMin, String displayUnit,
                               float rotation, int color, int alpha, int layerIndex, boolean frozen,
-                              java.util.List<com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation> animations) {
+                              java.util.List<com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation> animations,
+                              ResourceLocation displayModeId,
+                              com.github.haoyiyu.create_headsupdisplay.api.DisplayModeConfig modeConfig,
+                              java.util.List<String> dataValues) {
             this.sourcePos = sourcePos; this.posX = posX; this.posY = posY;
             this.scale = scale; this.text = text; this.displayLine = displayLine;
             this.displayMode = displayMode;
@@ -128,6 +136,9 @@ public class ClientHudData {
             this.rotation = rotation; this.color = color; this.alpha = alpha;
             this.layerIndex = layerIndex; this.frozen = frozen;
             this.animations = animations != null ? animations : java.util.List.of();
+            this.displayModeId = displayModeId;
+            this.modeConfig = modeConfig != null ? modeConfig : new com.github.haoyiyu.create_headsupdisplay.api.DisplayModeConfig(displayMax, displayMin, displayUnit);
+            this.dataValues = dataValues != null ? dataValues : java.util.List.of(text);
         }
     }
 
@@ -205,12 +216,23 @@ public class ClientHudData {
                         for (int ai = 0; ai < at.size(); ai++)
                             anims.add(com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation.deserialize(at.getCompound(ai)));
                     }
+                    ResourceLocation dmId = null;
+                    if (tag.contains("DisplayModeId")) try { dmId = ResourceLocation.parse(tag.getString("DisplayModeId")); } catch (Exception ignored) {}
+                    com.github.haoyiyu.create_headsupdisplay.api.DisplayModeConfig cfg = null;
+                    if (tag.contains("ModeConfig")) cfg = com.github.haoyiyu.create_headsupdisplay.api.DisplayModeConfig.deserialize(tag.getCompound("ModeConfig"));
+                    java.util.List<String> dv = java.util.List.of(tag.getString("text"));
+                    if (tag.contains("DataValues")) {
+                        var dvt = tag.getList("DataValues", CompoundTag.TAG_COMPOUND);
+                        var list = new java.util.ArrayList<String>();
+                        for (int di = 0; di < dvt.size(); di++) list.add(dvt.getCompound(di).getString("Val"));
+                        if (!list.isEmpty()) dv = list;
+                    }
                     slots.add(new SlotRenderData(sp, tag.getInt("posX"), tag.getInt("posY"),
                             tag.getFloat("scale"), tag.getString("text"), tag.getInt("displayLine"),
                             tag.getInt("DisplayMode"), tag.getFloat("DisplayMax"), tag.getFloat("DisplayMin"),
                             tag.getString("DisplayUnit"),
                             tag.getFloat("rotation"), tag.getInt("color"), tag.getInt("alpha"),
-                            li, frozenMap.getOrDefault(li, false), anims));
+                            li, frozenMap.getOrDefault(li, false), anims, dmId, cfg, dv));
                 }
             }
             if (data.contains("staticCount")) {

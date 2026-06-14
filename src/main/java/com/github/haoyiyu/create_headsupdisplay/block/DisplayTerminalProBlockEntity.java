@@ -100,6 +100,7 @@ public class DisplayTerminalProBlockEntity extends BlockEntity {
         for (ProLayer layer : layers) {
             for (DisplaySlot s : layer.getSlots()) {
                 if (s.getSourcePos().equals(sourcePos)) return s;
+                if (s.getSourcePositions().contains(sourcePos)) return s;
             }
         }
         return null;
@@ -120,9 +121,11 @@ public class DisplayTerminalProBlockEntity extends BlockEntity {
 
     public void updateSlotData(BlockPos sourcePos, String text, boolean sync) {
         for (ProLayer layer : layers)
-            for (DisplaySlot s : layer.getSlots())
-                if (s.getSourcePos().equals(sourcePos)) s.setLastData(text);
-        // 不自动创建 —— 只有玩家拖放才创建新槽位
+            for (DisplaySlot s : layer.getSlots()) {
+                int idx = s.getSourcePositions().indexOf(sourcePos);
+                if (idx >= 0) { s.setDataValue(idx, text); s.setLastData(text); }
+                else if (s.getSourcePos().equals(sourcePos)) s.setLastData(text);
+            }
         setChanged();
         if (sync) syncToBoundPlayers();
     }
@@ -347,8 +350,15 @@ public class DisplayTerminalProBlockEntity extends BlockEntity {
                 fd.putFloat("scale", s.getScale()); fd.putString("text", s.getLastData());
                 fd.putInt("displayLine", s.getDisplayLine()); fd.putFloat("rotation", s.getRotation());
                 fd.putInt("DisplayMode", s.getDisplayMode());
+                if (s.getDisplayModeId() != null) fd.putString("DisplayModeId", s.getDisplayModeId().toString());
                 fd.putFloat("DisplayMax", s.getDisplayMax()); fd.putFloat("DisplayMin", s.getDisplayMin());
                 fd.putString("DisplayUnit", s.getDisplayUnit() != null ? s.getDisplayUnit() : "");
+                fd.put("ModeConfig", s.getModeConfig().serialize());
+                if (!s.getDataValues().isEmpty()) {
+                    var dv = new net.minecraft.nbt.ListTag();
+                    for (String v : s.getDataValues()) { var dt = new CompoundTag(); dt.putString("Val", v != null ? v : ""); dv.add(dt); }
+                    fd.put("DataValues", dv);
+                }
                 net.minecraft.nbt.ListTag animSync = new net.minecraft.nbt.ListTag();
                 for (var a : s.getAnimations()) animSync.add(a.serialize());
                 fd.put("Animations", animSync);

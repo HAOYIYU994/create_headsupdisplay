@@ -39,6 +39,21 @@ public class CreateHeadsUpDisplay {
     public static final String MOD_ID = "create_headsupdisplay";
     public static final Logger LOGGER = LogUtils.getLogger();
 
+    static {
+        com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.register(new com.github.haoyiyu.create_headsupdisplay.client.gauge.TextMode());
+        com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.register(new com.github.haoyiyu.create_headsupdisplay.client.gauge.BarMode());
+        com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.register(new com.github.haoyiyu.create_headsupdisplay.client.gauge.AltimeterMode());
+        com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.register(new com.github.haoyiyu.create_headsupdisplay.client.gauge.DialMode());
+        com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.register(new com.github.haoyiyu.create_headsupdisplay.client.gauge.DigitalMode());
+        com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.register(new com.github.haoyiyu.create_headsupdisplay.client.gauge.HudAltMode());
+        com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.register(new com.github.haoyiyu.create_headsupdisplay.client.gauge.CompassMode());
+        com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.register(new com.github.haoyiyu.create_headsupdisplay.client.gauge.SpeedoMode());
+        com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.register(new com.github.haoyiyu.create_headsupdisplay.client.gauge.ChartMode());
+        com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.register(new com.github.haoyiyu.create_headsupdisplay.client.gauge.XYZMode());
+        com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.register(new com.github.haoyiyu.create_headsupdisplay.client.gauge.LEDMode());
+        com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.register(new com.github.haoyiyu.create_headsupdisplay.client.gauge.GyroMode());
+    }
+
     public CreateHeadsUpDisplay(IEventBus modBus, ModContainer container) {
         ModConfig.register(container);
         ModBlocks.register(modBus);
@@ -54,12 +69,25 @@ public class CreateHeadsUpDisplay {
 
         // 注册 Tooltip 事件监听（使用 NeoForge 事件总线）
         NeoForge.EVENT_BUS.addListener(this::onItemTooltip);
-        // 玩家登录时立即同步终端数据
+        // 玩家登录时标记需要同步，下一 tick 执行
         NeoForge.EVENT_BUS.addListener(this::onPlayerLogin);
+        NeoForge.EVENT_BUS.addListener((net.neoforged.neoforge.event.tick.PlayerTickEvent.Post e) -> {
+            if (pendingSync.remove(e.getEntity().getUUID()) && e.getEntity() instanceof ServerPlayer sp) {
+                var level = sp.serverLevel();
+                BlockPos pos = sp.blockPosition();
+                int r = 128;
+                for (BlockPos p : BlockPos.betweenClosed(pos.offset(-r,-r,-r), pos.offset(r,r,r))) {
+                    if (!level.isLoaded(p)) continue;
+                    if (level.getBlockEntity(p) instanceof DisplayTerminalBlockEntity t) t.syncToBoundPlayers();
+                    else if (level.getBlockEntity(p) instanceof DisplayTerminalProBlockEntity t) t.syncToBoundPlayers();
+                }
+            }
+        });
     }
 
     private void commonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
+            com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.lock();
             DisplayTarget.BY_BLOCK.register(ModBlocks.DISPLAY_TERMINAL.get(), new DisplayTerminalTarget());
             DisplayTarget.BY_BLOCK.register(ModBlocks.DISPLAY_TERMINAL_PRO.get(), new DisplayTerminalProTarget());
             DisplayTarget.BY_BLOCK.register(ModBlocks.OMNI_CORE.get(), new OmniCoreDisplayTarget());
@@ -137,19 +165,11 @@ public class CreateHeadsUpDisplay {
     }
 
     /** 玩家登录时立即同步附近终端数据到头盔和显示器 */
+    private static final java.util.Set<java.util.UUID> pendingSync = java.util.concurrent.ConcurrentHashMap.newKeySet();
+
     private void onPlayerLogin(PlayerEvent.PlayerLoggedInEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer sp)) return;
-        var level = sp.serverLevel();
-        BlockPos playerPos = sp.blockPosition();
-        int range = 128;
-        for (BlockPos p : BlockPos.betweenClosed(
-                playerPos.offset(-range, -range, -range),
-                playerPos.offset(range, range, range))) {
-            if (level.getBlockEntity(p) instanceof DisplayTerminalBlockEntity terminal) {
-                terminal.syncToBoundPlayers();
-            } else if (level.getBlockEntity(p) instanceof DisplayTerminalProBlockEntity terminal) {
-                terminal.syncToBoundPlayers();
-            }
+        if (event.getEntity() instanceof ServerPlayer sp) {
+            pendingSync.add(sp.getUUID());
         }
     }
 

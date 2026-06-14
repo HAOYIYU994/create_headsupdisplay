@@ -1,340 +1,130 @@
 package com.github.haoyiyu.create_headsupdisplay.screen;
 
+import com.github.haoyiyu.create_headsupdisplay.api.*;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.function.Consumer;
 
-/**
- * 显示模式选择面板 — 左侧模式列表，右侧大预览 + 参数编辑。
- */
+/** Mode creator panel — mode list, params, data binding zones, commit button */
 public class DisplayStylePanel {
-    private static final int PANEL_W = 260;
-    private static final int LIST_W = 64;
-    private static final int PREVIEW_X = LIST_W + 2;
-    private static final int PREVIEW_W = PANEL_W - PREVIEW_X;
-    private static final int PREVIEW_H = 80;
-    private static final int PARAM_H = 14;
-    private static final int ROW_H = 20;
+    private static final int PANEL_W = 220, LIST_W = 60, PREVIEW_X = LIST_W + 2, PREVIEW_W = PANEL_W - PREVIEW_X;
+    private static final int PREVIEW_H = 55, PARAM_H = 13, ROW_H = 16, BIND_H = 18, MAX_H = 300;
 
-    private int panelX, panelY;
-    private boolean visible = false;
-    private int draggingTitle, dragOffX, dragOffY;
-
-    // 模式定义
-    private static final String[] MODE_KEYS = {
-        "gui.create_headsupdisplay.pro.display_mode.text",
-        "gui.create_headsupdisplay.pro.display_mode.bar",
-        "gui.create_headsupdisplay.pro.display_mode.alt",
-        "gui.create_headsupdisplay.pro.display_mode.dial",
-        "gui.create_headsupdisplay.pro.display_mode.digit",
-        "gui.create_headsupdisplay.pro.display_mode.hudalt"
-    };
-    private static final boolean[] MODE_NUMERIC = {false, true, true, true, true, true};
-    private static final int MODE_COUNT = 6;
-
-    private SlotDataProvider slotData;
-    private int hoveredMode = -1;
-    private final java.util.function.Consumer<String> onParamChange;
-
-    // 参数编辑状态
-    private int editingField = -1; // 0=max 1=min 2=unit
-    private String editMax = "", editMin = "", editUnit = "";
+    private int panelX, panelY, draggingTitle, dragOffX, dragOffY;
+    private boolean visible;
+    private int leftScroll, rightScroll;
+    private List<IDisplayMode> allModes = List.of();
+    private int hoveredModeIdx = -1;
+    private ModeTarget target;
+    private final Consumer<String> onParamChange;
+    private final Runnable onCommit;
+    private int editingField = -1;
+    private final List<String> editValues = new ArrayList<>();
     private boolean dataIsNumeric;
+    private Font font;
+    private long rejectUntil;
+    private int rejectIdx;
+    // Stored positions from last render
+    private final int[] zoneYs = new int[16];
+    private int zoneCount;
+    private int btnX, btnY, btnW;
 
-    public interface SlotDataProvider {
-        String getText();
-        int getDisplayMode();
-        float getDisplayMax();
-        float getDisplayMin();
-        String getDisplayUnit();
-        float getScale();
-        int getColor();
-        int getAlpha();
+    public interface ModeTarget {
+        ResourceLocation getDisplayModeId();
+        void setDisplayModeId(ResourceLocation id);
+        List<String> getDataValues();
+        DisplayModeConfig getModeConfig();
+        int getColor(); int getAlpha();
+        List<BlockPos> getSourcePositions();
+        List<String> getSourceNames();
+        void bindSource(int index, BlockPos pos, String name, String value);
+        void unbindSource(int index);
     }
 
-    public interface DisplayStyleTarget {
-        void setDisplayMode(int mode);
+    public DisplayStylePanel(Consumer<String> onParamChange, Runnable onCommit) {
+        this.onParamChange = onParamChange; this.onCommit = onCommit;
     }
 
-    public DisplayStylePanel(java.util.function.Consumer<String> onParamChange) {
-        this.onParamChange = onParamChange;
+    public void show(int x, int y, ModeTarget target) {
+        panelX=x; panelY=y; visible=true; leftScroll=0; rightScroll=0; this.target=target;
+        allModes=new ArrayList<>(DisplayModeRegistry.getAll());
+        String first=target.getDataValues().isEmpty()?"":target.getDataValues().get(0);
+        dataIsNumeric=first.isEmpty()||checkNumeric(first);
+        var id=target.getDisplayModeId(); hoveredModeIdx=-1;
+        if(id!=null)for(int i=0;i<allModes.size();i++)if(allModes.get(i).getId().equals(id)){hoveredModeIdx=i;break;}
+        var m=getMode(); editValues.clear();
+        if(m!=null)for(var p:m.getConfigParameters())editValues.add(fmt(target.getModeConfig(),p));
+        editingField=-1;
     }
+    public void hide(){visible=false;editingField=-1;}
+    public boolean isVisible(){return visible;}
+    private IDisplayMode getMode(){return hoveredModeIdx>=0&&hoveredModeIdx<allModes.size()?allModes.get(hoveredModeIdx):null;}
 
-    public void show(int x, int y, SlotDataProvider data) {
-        panelX = x; panelY = y; visible = true;
-        slotData = data;
-        dataIsNumeric = checkNumeric(data.getText());
-        int mode = data.getDisplayMode();
-        editMax = formatFloat(data.getDisplayMax());
-        editMin = formatFloat(data.getDisplayMin());
-        editUnit = data.getDisplayUnit();
-        // 数据自带单位时自动填充
-        if (editUnit.isEmpty()) {
-            String autoUnit = com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.extractUnit(data.getText());
-            if (!autoUnit.isEmpty()) editUnit = autoUnit;
-        }
-        hoveredMode = mode;
-        editingField = -1;
-    }
-
-    private static String formatFloat(float v) {
-        if (v == (int) v) return String.valueOf((int) v);
-        return String.format("%.1f", v);
-    }
-
-    public void hide() { visible = false; editingField = -1; }
-    public boolean isVisible() { return visible; }
+    private String fmt(DisplayModeConfig c,ConfigParamDescriptor p){return switch(p.type()){
+        case FLOAT->{float v=c.getFloat(p.key(),((Number)p.defaultValue()).floatValue());yield v==(int)v?String.valueOf((int)v):String.format("%.1f",v);}
+        case INT->String.valueOf(c.getInt(p.key(),((Number)p.defaultValue()).intValue()));
+        case STRING->c.getString(p.key(),(String)p.defaultValue());
+        case BOOLEAN->String.valueOf(c.getBoolean(p.key(),(Boolean)p.defaultValue()));
+        case COLOR->String.format("#%06X",c.getInt(p.key(),((Number)p.defaultValue()).intValue()));
+    };}
 
     public void render(GuiGraphics g, Font font, int mx, int my) {
-        if (!visible || slotData == null) return;
-        int mode = slotData.getDisplayMode();
-        int rows = MODE_COUNT;
-        int listH = rows * ROW_H;
-        int h = 16 + 2 + Math.max(listH, PREVIEW_H + PARAM_H * 3 + 4) + 2;
-        g.fill(panelX, panelY, panelX + PANEL_W, panelY + h, 0xFF1A1A2E);
-        g.fill(panelX, panelY, panelX + PANEL_W, panelY + 1, 0xFF6060CC);
-
-        // 标题栏
-        int ty = panelY + 2;
-        g.fill(panelX + 2, ty, panelX + PANEL_W - 2, ty + 12, 0xFF2A2A4A);
-        g.drawString(font, Component.translatable("gui.create_headsupdisplay.pro.display_style").getString(), panelX + 6, ty + 2, 0xFFCCCCFF);
-        int closeX = panelX + PANEL_W - 16;
-        boolean ch = mx >= closeX && mx <= closeX + 12 && my >= ty && my <= ty + 12;
-        g.fill(closeX, ty, closeX + 12, ty + 12, ch ? 0xFFFF4444 : 0xCC883333);
-        g.drawString(font, "X", closeX + 3, ty + 2, 0xFFFFFFFF);
-
-        // === 左侧模式列表 ===
-        int ry = panelY + 18;
-        for (int i = 0; i < MODE_COUNT; i++) {
-            boolean hover = mx >= panelX + 2 && mx <= panelX + LIST_W && my >= ry && my <= ry + ROW_H;
-            boolean cur = mode == i;
-            boolean disabled = MODE_NUMERIC[i] && !dataIsNumeric;
-
-            int bg;
-            if (cur) bg = 0xFF445577;
-            else if (hover && !disabled) bg = 0xFF333355;
-            else bg = 0xFF222233;
-            g.fill(panelX + 2, ry, panelX + LIST_W, ry + ROW_H, bg);
-            if (cur) {
-                g.fill(panelX + 2, ry, panelX + 5, ry + ROW_H, 0xFF4488FF);
-            }
-
-            int nameC = disabled ? 0xFF444444 : (cur ? 0xFF88CCFF : 0xFFCCCCCC);
-            g.drawString(font, Component.translatable(MODE_KEYS[i]).getString(), panelX + 9, ry + (ROW_H - 9) / 2, nameC);
-            if (disabled) {
-                g.drawString(font, "!", panelX + LIST_W - 10, ry + (ROW_H - 9) / 2, 0xFF663333);
-            }
-
-            ry += ROW_H;
-        }
-
-        // === 右侧预览 ===
-        int px = panelX + PREVIEW_X + 4;
-        int py = panelY + 18;
-        int pw = PREVIEW_W - 8, ph = PREVIEW_H;
-        g.fill(px - 2, py - 2, px + pw + 2, py + ph + 2, 0xFF111122);
-        g.fill(px - 2, py - 2, px + pw + 2, py, 0xFF335577);
-
-        int mx_preview = px + pw / 2;
-        int my_preview = py + ph / 2;
-        renderLargePreview(g, font, mode, px, py, pw, ph);
-
-        // === 参数编辑 ===
-        int paramY = py + ph + 4;
-        // Max
-        drawParamRow(g, font, mx, my, paramY, 0, "gui.create_headsupdisplay.pro.param.max", editMax);
-        paramY += PARAM_H;
-        // Min
-        drawParamRow(g, font, mx, my, paramY, 1, "gui.create_headsupdisplay.pro.param.min", editMin);
-        paramY += PARAM_H;
-        // Unit
-        drawParamRow(g, font, mx, my, paramY, 2, "gui.create_headsupdisplay.pro.param.unit", editUnit);
-
-        // 保存提示
-        paramY += PARAM_H + 2;
-        if (editingField >= 0) {
-            g.drawString(font, "Enter→save  Esc→cancel", px, paramY, 0xFF8888AA);
-        }
-
-        // 数值不可用时提示
-        if (!dataIsNumeric) {
-            g.drawString(font, Component.translatable("gui.create_headsupdisplay.pro.data_not_numeric").getString(), px, py + ph / 2 - 4, 0xFFFF4444);
-        }
+        this.font=font; if(!visible||target==null)return;
+        var cur=getMode(); int totalH=allModes.size()*ROW_H, maxListH=MAX_H-16, listH=Math.min(totalH,maxListH);
+        leftScroll=Mth.clamp(leftScroll,0,Math.max(0,totalH-maxListH));
+        int pc=cur!=null?cur.getConfigParameters().size():3, act=target.getSourcePositions().size();
+        int needed=cur!=null?cur.getMinDataSourceCount():1, dst=Math.max(needed,act);
+        int bindH=dst>0?(14+dst*(BIND_H+2)+BIND_H):0, rightH=PREVIEW_H+4+pc*PARAM_H+bindH+8;
+        rightScroll=Mth.clamp(rightScroll,0,Math.max(0,rightH-(MAX_H-16)));
+        int ph=16+Math.min(Math.max(listH,rightH),MAX_H)+2;
+        g.fill(panelX,panelY,panelX+PANEL_W,panelY+ph,0xFF1A1A2E); g.fill(panelX,panelY,panelX+PANEL_W,panelY+1,0xFF6060CC);
+        // Title
+        int ty=panelY+2; g.fill(panelX+2,ty,panelX+PANEL_W-2,ty+12,0xFF2A2A4A);
+        g.drawString(font,Component.translatable("gui.create_headsupdisplay.pro.display_style").getString(),panelX+6,ty+2,0xFFCCCCFF);
+        int cx=panelX+PANEL_W-16; boolean ch=mx>=cx&&mx<=cx+12&&my>=ty&&my<=ty+12; g.fill(cx,ty,cx+12,ty+12,ch?0xFFFF4444:0xCC883333); g.drawString(font,"X",cx+3,ty+2,0xFFFFFFFF);
+        // Mode list
+        int tY=panelY+16; g.enableScissor(panelX,tY,panelX+LIST_W,tY+maxListH);
+        int ry=tY-leftScroll;
+        for(int i=0;i<allModes.size();i++){var m=allModes.get(i);if(ry+ROW_H>tY&&ry<tY+maxListH){boolean h=mx>=panelX+2&&mx<=panelX+LIST_W&&my>=ry&&my<=ry+ROW_H,isCur=cur!=null&&cur.getId().equals(m.getId()),dis=m.needsNumericData()&&!dataIsNumeric;int bg=isCur?0xFF445577:(h&&!dis?0xFF333355:0xFF222233);g.fill(panelX+2,ry,panelX+LIST_W,ry+ROW_H,bg);if(isCur)g.fill(panelX+2,ry,panelX+5,ry+ROW_H,0xFF4488FF);int nc=dis?0xFF444444:(isCur?0xFF88CCFF:0xFFCCCCCC);g.drawString(font,m.getDisplayName().getString(),panelX+9,ry+(ROW_H-8)/2,nc);if(dis)g.drawString(font,"!",panelX+LIST_W-10,ry+(ROW_H-8)/2,0xFF663333);}ry+=ROW_H;}
+        g.disableScissor();
+        // Right content
+        int px=panelX+PREVIEW_X+4,py=panelY+16,rcy=rightScroll; g.enableScissor(panelX+PREVIEW_X,tY,panelX+PANEL_W,tY+maxListH);
+        int pvy=py-rcy; if(pvy+PREVIEW_H>tY&&pvy<tY+maxListH){g.fill(px-2,pvy-2,px+PREVIEW_W-8+2,pvy+PREVIEW_H+2,0xFF111122);g.fill(px-2,pvy-2,px+PREVIEW_W-8+2,pvy,0xFF335577);renderPreview(g,font,px,pvy,PREVIEW_W-8,PREVIEW_H);}
+        int rowY=py+PREVIEW_H+2-rcy;
+        if(cur!=null){var ps=cur.getConfigParameters();
+            for(int fi=0;fi<ps.size();fi++){if(rowY+PARAM_H>tY&&rowY<tY+maxListH)drawParamRow(g,font,mx,my,px,rowY,fi,ps.get(fi).key(),fi<editValues.size()?editValues.get(fi):"");rowY+=PARAM_H;}
+            rowY+=4; if(dst>0){int bY=rowY; g.drawString(font,"◎ "+Component.translatable("gui.create_headsupdisplay.pro.bind_sources").getString(),px,bY,0xFFCCCC88);int bzY=bY+11;var pos=target.getSourcePositions();var nms=target.getSourceNames();int bw=PREVIEW_W-8;zoneCount=dst;
+                for(int bi=0;bi<dst;bi++){zoneYs[bi]=bzY;if(bzY+BIND_H>tY&&bzY<tY+maxListH){boolean isBound=bi<pos.size()&&pos.get(bi)!=null&&!BlockPos.ZERO.equals(pos.get(bi));String sn=isBound&&bi<nms.size()?nms.get(bi):"";String lb=slotLabel(cur,bi,bi+1);boolean fl=System.currentTimeMillis()<rejectUntil&&rejectIdx==bi;int zc=fl?(System.currentTimeMillis()/100%2==0?0xFF442222:0xFF222233):(isBound?0xFF1A3322:0xFF222233),bc=fl?0xFFFF4444:(isBound?0xFF44AA44:0x66555577);g.fill(px,bzY,px+bw,bzY+BIND_H,zc);
+                    if(isBound){g.fill(px,bzY,px+bw,bzY+1,bc);g.fill(px,bzY+BIND_H-1,px+bw,bzY+BIND_H,bc);g.fill(px,bzY,px+1,bzY+BIND_H,bc);g.fill(px+bw-1,bzY,px+bw,bzY+BIND_H,bc);String d=sn.length()>14?sn.substring(0,13)+".":sn;g.drawString(font,lb+": "+d,px+4,bzY+2,0xFF44CC44);int ux=px+bw-14,bt=bzY+2;boolean uh=mx>=ux&&mx<=ux+10&&my>=bt&&my<=bt+10;g.fill(ux,bt,ux+10,bt+10,uh?0xFFFF4444:0xCC883333);g.drawString(font,"✕",ux+2,bt+1,0xFFFFFFFF);}else{dash(g,px,bzY,px+bw,bzY+BIND_H,0x66555577);g.drawString(font,lb+": "+Component.translatable("gui.create_headsupdisplay.pro.bind_drop_hint").getString(),px+4,bzY+2,fl?0xFFFF8888:0xFF666688);}}bzY+=BIND_H+2;}
+                bzY+=1; String al=Component.translatable("gui.create_headsupdisplay.pro.commit_to_canvas").getString(); btnW=font.width("  "+al+"  ")+2; btnX=px+bw-btnW; btnY=bzY; boolean ah=mx>=btnX&&mx<=btnX+btnW&&my>=bzY&&my<=bzY+BIND_H; g.fill(btnX,bzY,btnX+btnW,bzY+BIND_H,ah?0xFF446655:0xFF2A3A2A); g.drawString(font,al,btnX+4,bzY+2,ah?0xFF88FFAA:0xFF668866);}}
+        g.disableScissor();
+        if(!dataIsNumeric&&cur!=null&&cur.needsNumericData())g.drawString(font,Component.translatable("gui.create_headsupdisplay.pro.data_not_numeric").getString(),px,py+PREVIEW_H/2-4-rcy,0xFFFF4444);
+        if(editingField>=0)g.drawString(font,"Enter→save  Esc→cancel",px,tY+maxListH+2,0xFF8888AA);
     }
+    private String slotLabel(IDisplayMode m,int i,int n){var ps=m.getConfigParameters();if(ps.size()>=3&&m.getMinDataSourceCount()>=3){for(var p:ps){if(p.key().equals("labelX")&&i==0)return target.getModeConfig().getString("labelX","X");if(p.key().equals("labelY")&&i==1)return target.getModeConfig().getString("labelY","Y");if(p.key().equals("labelZ")&&i==2)return target.getModeConfig().getString("labelZ","Z");}}return Component.translatable("gui.create_headsupdisplay.pro.bind_slot").getString()+n;}
+    private void renderPreview(GuiGraphics g,Font font,int x,int y,int w,int h){if(target==null)return;var m=getMode();if(m==null)return;var dv=target.getDataValues();if(dv==null||dv.isEmpty())dv=List.of("");g.pose().pushPose();g.pose().translate(x,y,0);m.renderPreview(g,font,dv,target.getModeConfig(),w,h);g.pose().popPose();}
+    private void drawParamRow(GuiGraphics g,Font font,int mx,int my,int px,int y,int fi,String key,String val){String lb=Component.translatable("gui.create_headsupdisplay.pro.param."+key).getString();if(lb.equals("gui.create_headsupdisplay.pro.param."+key))lb=key;g.drawString(font,lb+":",px,y+1,0xFF8888CC);int vx=px+font.width(lb+":")+4,vw=60;boolean h=mx>=vx&&mx<=vx+vw&&my>=y&&my<=y+PARAM_H,ed=editingField==fi;g.fill(vx,y,vx+vw,y+PARAM_H,ed?0xFF334466:(h?0xFF222244:0xFF1A1A30));g.drawString(font,ed?val+"_":val,vx+2,y+1,ed?0xFFFFFFFF:0xFFAAAAAA);}
 
-    private void drawParamRow(GuiGraphics g, Font font, int mx, int my, int y, int fieldId, String labelKey, String value) {
-        int x = panelX + PREVIEW_X + 4;
-        g.drawString(font, Component.translatable(labelKey).getString(), x, y + 2, 0xFF8888CC);
-        String labelText = Component.translatable(labelKey).getString();
-        int vx = x + font.width(labelText) + 2;
-        int vw = 80;
-        boolean hover = mx >= vx && mx <= vx + vw && my >= y && my <= y + PARAM_H;
-        boolean editing = editingField == fieldId;
-        int bg = editing ? 0xFF334466 : (hover ? 0xFF222244 : 0xFF1A1A30);
-        g.fill(vx, y, vx + vw, y + PARAM_H, bg);
-        String display = editing ? value + "_" : value;
-        g.drawString(font, display, vx + 3, y + 2, editing ? 0xFFFFFFFF : 0xFFAAAAAA);
-    }
+    private void dash(GuiGraphics g,int x1,int y1,int x2,int y2,int c){int d=3;for(int x=x1;x<x2;x+=d*2)g.fill(x,y1,Math.min(x+d,x2),y1+1,c);for(int x=x1;x<x2;x+=d*2)g.fill(x,y2-1,Math.min(x+d,x2),y2,c);for(int y=y1;y<y2;y+=d*2)g.fill(x1,y,x1+1,Math.min(y+d,y2),c);for(int y=y1;y<y2;y+=d*2)g.fill(x2-1,y,x2,Math.min(y+d,y2),c);}
 
-    /** 大幅预览 — GaugeRenderer 在 (0,0) 渲染，pushPose 平移到预览区 */
-    private void renderLargePreview(GuiGraphics g, Font font, int mode, int x, int y, int w, int h) {
-        if (slotData == null) return;
-        int tc = 0xFF000000 | (slotData.getColor() & 0xFFFFFF);
-        String text = slotData.getText().replaceAll("§[0-9a-fk-or]", "");
-        float max = slotData.getDisplayMax(), min = slotData.getDisplayMin();
-        String unit = slotData.getDisplayUnit();
+    public boolean mouseClicked(double mx,double my,int btn){if(!visible)return false;if(unbindClicked(mx,my))return true;if(commitClicked(mx,my))return true;int ph=16+MAX_H+2,ty=panelY+2,cx=panelX+PANEL_W-16;if(mx>=cx&&mx<=cx+12&&my>=ty&&my<=ty+12){visible=false;return true;}if(mx>=panelX+2&&mx<=panelX+PANEL_W-18&&my>=ty&&my<=ty+12){draggingTitle=1;dragOffX=(int)(mx-panelX);dragOffY=(int)(my-panelY);return true;}int tY=panelY+16,ry=tY-leftScroll;for(int i=0;i<allModes.size();i++){if(mx>=panelX+2&&mx<=panelX+LIST_W&&my>=ry&&my<=ry+ROW_H){var m=allModes.get(i);if(!(m.needsNumericData()&&!dataIsNumeric)&&target!=null){target.setDisplayModeId(m.getId());hoveredModeIdx=i;if(onParamChange!=null)onParamChange.accept("mode");var cfg=target.getModeConfig();editValues.clear();for(var p:m.getConfigParameters())editValues.add(fmt(cfg,p));}return true;}ry+=ROW_H;}var cur=getMode();if(cur!=null){int py=panelY+16+PREVIEW_H+2-rightScroll;for(int fi=0;fi<cur.getConfigParameters().size();fi++){int vx=panelX+PREVIEW_X+4+font.width(Component.translatable("gui.create_headsupdisplay.pro.param."+cur.getConfigParameters().get(fi).key()).getString()+":")+8;if(mx>=vx&&mx<=vx+60&&my>=py&&my<=py+PARAM_H){editingField=fi;return true;}py+=PARAM_H;}}if(my<panelY||my>panelY+ph||mx<panelX||mx>panelX+PANEL_W)return false;return false;}
+    public boolean mouseDragged(double mx,double my){if(!visible||draggingTitle==0)return false;panelX=(int)mx-dragOffX;panelY=(int)my-dragOffY;return true;}
+    public boolean mouseReleased(){draggingTitle=0;return false;}
+    public boolean mouseScrolled(double mx,double my,double sy){if(!visible)return false;int tY=panelY+16;if(mx>=panelX&&mx<=panelX+LIST_W&&my>=tY&&my<=tY+MAX_H-16){leftScroll-= (int)sy*16;leftScroll=Mth.clamp(leftScroll,0,Math.max(0,allModes.size()*ROW_H-(MAX_H-16)));return true;}if(mx>=panelX+PREVIEW_X&&mx<=panelX+PANEL_W&&my>=tY&&my<=tY+MAX_H-16){rightScroll-= (int)sy*16;return true;}return false;}
+    public boolean keyPressed(int kc){if(!visible||editingField<0||editingField>=editValues.size())return false;String c=editValues.get(editingField);if(kc==259&&!c.isEmpty())editValues.set(editingField,c.substring(0,c.length()-1));else if(kc==257){applyEdit();editingField=-1;}else if(kc==256)editingField=-1;return true;}
+    public boolean charTyped(char ch){if(!visible||editingField<0)return false;var m=getMode();if(m==null||editingField>=m.getConfigParameters().size())return false;var t=m.getConfigParameters().get(editingField).type();String c=editValues.get(editingField);boolean v=switch(t){case FLOAT,INT->(ch>='0'&&ch<='9')||ch=='.'||ch=='-';case BOOLEAN->ch=='t'||ch=='f'||ch=='T'||ch=='F';case COLOR->(ch>='0'&&ch<='9')||(ch>='a'&&ch<='f')||(ch>='A'&&ch<='F')||ch=='#';case STRING->ch>=32;};if(v&&c.length()<16)editValues.set(editingField,c+ch);return true;}
+    private void applyEdit(){var m=getMode();if(m==null||target==null)return;var cfg=target.getModeConfig();var ps=m.getConfigParameters();for(int i=0;i<ps.size()&&i<editValues.size();i++){var p=ps.get(i);String r=editValues.get(i);try{switch(p.type()){case FLOAT->cfg.setFloat(p.key(),Float.parseFloat(r));case INT->cfg.setInt(p.key(),Integer.parseInt(r));case STRING->cfg.setString(p.key(),r);case BOOLEAN->cfg.setBoolean(p.key(),Boolean.parseBoolean(r));case COLOR->cfg.setInt(p.key(),(int)Long.parseLong(r.replace("#",""),16));}}catch(NumberFormatException ignored){}if(onParamChange!=null)onParamChange.accept(p.key()+":"+r);}}
 
-        g.pose().pushPose();
-        g.pose().translate(x, y, 0);
-        switch (mode) {
-            case 0 -> {
-                String t = text.length() > 24 ? text.substring(0, 23) + "." : text;
-                int tw = font.width(t);
-                g.drawString(font, t, w/2 - tw/2, h/2 - 4, tc);
-            }
-            case 1 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderBar(
-                    g, font, text, tc, max, unit, w, h);
-            case 2 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderAltimeter(
-                    g, font, text, tc, min, max, unit, w, h);
-            case 3 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderDial(
-                    g, font, text, tc, max, unit, w, h);
-            case 4 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderDigital(
-                    g, font, text, tc, unit, w, h);
-            case 5 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderHudAltimeter(
-                    g, font, text, tc, min, max, unit, w, h);
-        }
-        g.pose().popPose();
-    }
-
-    // === 鼠标 ===
-
-    public boolean mouseClicked(double mx, double my, int button) {
-        if (!visible) return false;
-        int rows = MODE_COUNT;
-        int listH = rows * ROW_H;
-        int h = 16 + 2 + Math.max(listH, PREVIEW_H + PARAM_H * 3 + 4) + 2;
-
-        // 关闭
-        int ty = panelY + 2;
-        int closeX = panelX + PANEL_W - 16;
-        if (mx >= closeX && mx <= closeX + 12 && my >= ty && my <= ty + 12) { visible = false; return true; }
-        // 拖拽
-        if (mx >= panelX + 2 && mx <= panelX + PANEL_W - 18 && my >= ty && my <= ty + 12) {
-            draggingTitle = 1; dragOffX = (int)(mx - panelX); dragOffY = (int)(my - panelY); return true;
-        }
-
-        // 左侧模式列表
-        int ry = panelY + 18;
-        for (int i = 0; i < MODE_COUNT; i++) {
-            if (mx >= panelX + 2 && mx <= panelX + LIST_W && my >= ry && my <= ry + ROW_H) {
-                boolean disabled = MODE_NUMERIC[i] && !dataIsNumeric;
-                if (!disabled && slotData instanceof DisplayStyleTarget target) {
-                    target.setDisplayMode(i);
-                    hoveredMode = i;
-                    if (onParamChange != null) onParamChange.accept("mode");
-                }
-                return true;
-            }
-            ry += ROW_H;
-        }
-
-        // 参数编辑框
-        int px = panelX + PREVIEW_X + 4;
-        int py = panelY + 18;
-        int paramYBase = py + PREVIEW_H + 4;
-        for (int f = 0; f < 3; f++) {
-            int fy = paramYBase + f * PARAM_H;
-            int vx = px + fontWidth(f) + 2;
-            int vw = 80;
-            if (mx >= vx && mx <= vx + vw && my >= fy && my <= fy + PARAM_H) {
-                if (MODE_NUMERIC[slotData.getDisplayMode()] || f == 2) { // unit always editable
-                    editingField = f;
-                }
-                return true;
-            }
-        }
-
-        // 外面
-        if (my < panelY || my > panelY + h || mx < panelX || mx > panelX + PANEL_W) return false;
-        // 面板内非交互区也消费事件
-        return true;
-    }
-
-    private int fontWidth(int fieldId) {
-        return 32; // "Max:" "Min:" "Unit:" 大约等宽
-    }
-
-    public boolean mouseDragged(double mx, double my) {
-        if (!visible || draggingTitle == 0) return false;
-        panelX = (int) mx - dragOffX; panelY = (int) my - dragOffY;
-        return true;
-    }
-    public boolean mouseReleased() { draggingTitle = 0; return false; }
-
-    // === 键盘 ===
-
-    public boolean keyPressed(int keyCode) {
-        if (!visible || editingField < 0) return false;
-        String[] fields = {editMax, editMin, editUnit};
-        String current = fields[editingField];
-        if (keyCode == 259 && !current.isEmpty()) { // backspace
-            setEditField(editingField, current.substring(0, current.length() - 1));
-        } else if (keyCode == 257) { // Enter
-            applyEdit();
-            editingField = -1;
-        } else if (keyCode == 256) { // Escape
-            editingField = -1;
-        }
-        return true;
-    }
-
-    public boolean charTyped(char c) {
-        if (!visible || editingField < 0) return false;
-        String[] fields = {editMax, editMin, editUnit};
-        String current = fields[editingField];
-        if (editingField == 2) { // unit: allow letters
-            if (c >= 32 && current.length() < 6) setEditField(2, current + c);
-        } else { // max/min: allow digits, dot, minus
-            if ((c >= '0' && c <= '9') || c == '.' || c == '-') {
-                if (current.length() < 10) setEditField(editingField, current + c);
-            }
-        }
-        return true;
-    }
-
-    private void setEditField(int f, String v) {
-        switch (f) {
-            case 0 -> editMax = v;
-            case 1 -> editMin = v;
-            case 2 -> editUnit = v;
-        }
-    }
-
-    private void applyEdit() {
-        if (slotData instanceof DisplayStyleTarget) {
-            // 将编辑的值存到一个临时 map 或通过回调传出
-        }
-        if (onParamChange != null) {
-            onParamChange.accept("max:" + editMax);
-            onParamChange.accept("min:" + editMin);
-            onParamChange.accept("unit:" + editUnit);
-        }
-    }
-
-    public String getEditMax() { return editMax; }
-    public String getEditMin() { return editMin; }
-    public String getEditUnit() { return editUnit; }
-
-    private static boolean checkNumeric(String text) {
-        String t = text.replaceAll("§[0-9a-fk-or]", "").trim();
-        int sp = t.indexOf(' ');
-        if (sp > 0) t = t.substring(0, sp);
-        try {
-            Float.parseFloat(t);
-            return true;
-        } catch (NumberFormatException e) {
-            return false;
-        }
-    }
+    public boolean unbindClicked(double mx,double my){if(!visible||target==null)return false;int px=panelX+PREVIEW_X+4;for(int bi=0;bi<zoneCount;bi++){int ux=px+PREVIEW_W-8-14;if(mx>=ux&&mx<=ux+10&&my>=zoneYs[bi]+2&&my<=zoneYs[bi]+12){target.unbindSource(bi);return true;}}return false;}
+    private boolean commitClicked(double mx,double my){if(target==null||onCommit==null)return false;if(mx>=btnX&&mx<=btnX+btnW&&my>=btnY&&my<=btnY+BIND_H){onCommit.run();return true;}return false;}
+    public int bindZoneAt(double mx,double my){if(!visible||target==null)return -1;int px=panelX+PREVIEW_X+4;for(int bi=0;bi<zoneCount;bi++)if(mx>=px&&mx<=px+PREVIEW_W-8&&my>=zoneYs[bi]&&my<=zoneYs[bi]+BIND_H)return bi;return -1;}
+    public void rejectBind(int zi){rejectUntil=System.currentTimeMillis()+500;rejectIdx=zi;}
+    public static boolean isNumeric(String t){return checkNumeric(t);}
+    private static boolean checkNumeric(String t){String s=t.replaceAll("§[0-9a-fk-or]","").trim();int sp=s.indexOf(' ');if(sp>0)s=s.substring(0,sp);try{Float.parseFloat(s);return true;}catch(NumberFormatException e){return false;}}
 }

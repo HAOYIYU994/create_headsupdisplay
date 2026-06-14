@@ -61,6 +61,7 @@ public class TerminalProConfigScreen extends Screen {
     private final ProColorPicker colorPicker;
     private final DisplayStylePanel stylePanel;
     private final AnimationPanel animPanel;
+    private SlotEntry draftEntry;
     private Object colorEditTarget = null;
 
     // 图层重命名
@@ -74,7 +75,7 @@ public class TerminalProConfigScreen extends Screen {
     private long animStartTime = 0;
 
     // ====== 内部数据类 ======
-    private static class SlotEntry implements DisplayStylePanel.DisplayStyleTarget, DisplayStylePanel.SlotDataProvider {
+    private static class SlotEntry implements DisplayStylePanel.ModeTarget {
         final BlockPos sourcePos;
         int instanceId;
         int posX, posY;
@@ -86,17 +87,23 @@ public class TerminalProConfigScreen extends Screen {
         float displayMax = 100f, displayMin = 0f;
         String displayUnit = "";
         final List<com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation> animations = new ArrayList<>();
+        ResourceLocation displayModeId;
+        com.github.haoyiyu.create_headsupdisplay.api.DisplayModeConfig modeConfig = new com.github.haoyiyu.create_headsupdisplay.api.DisplayModeConfig();
+        final List<BlockPos> sourcePositions = new ArrayList<>();
+        final List<String> dataValues = new ArrayList<>();
+        final List<String> sourceNames = new ArrayList<>();
         static int nextId = 0;
-        SlotEntry(BlockPos sp, int lx) { sourcePos = sp; posX = 100; posY = 100; layerIndex = lx; instanceId = nextId++; }
-        @Override public void setDisplayMode(int m) { this.displayMode = m; }
-        @Override public int getDisplayMode() { return displayMode; }
-        @Override public String getText() { return text; }
-        @Override public float getDisplayMax() { return displayMax; }
-        @Override public float getDisplayMin() { return displayMin; }
-        @Override public String getDisplayUnit() { return displayUnit; }
-        @Override public float getScale() { return scale; }
+        SlotEntry(BlockPos sp, int lx) { sourcePos = sp; posX = 100; posY = 100; layerIndex = lx; instanceId = nextId++; sourcePositions.add(sp); }
+        @Override public ResourceLocation getDisplayModeId() { return displayModeId; }
+        @Override public void setDisplayModeId(ResourceLocation id) { this.displayModeId=id; var m=com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.get(id); if(m!=null&&m.getLegacyId()>=0)this.displayMode=m.getLegacyId(); }
+        @Override public java.util.List<String> getDataValues() { if(!dataValues.isEmpty())return dataValues; return java.util.List.of(text!=null?text:""); }
+        @Override public com.github.haoyiyu.create_headsupdisplay.api.DisplayModeConfig getModeConfig() { return modeConfig; }
         @Override public int getColor() { return color; }
         @Override public int getAlpha() { return alpha; }
+        @Override public java.util.List<BlockPos> getSourcePositions() { return sourcePositions; }
+        @Override public java.util.List<String> getSourceNames() { return sourceNames; }
+        @Override public void bindSource(int idx, BlockPos pos, String name, String value) { while(sourcePositions.size()<=idx)sourcePositions.add(BlockPos.ZERO); while(dataValues.size()<=idx)dataValues.add(""); while(sourceNames.size()<=idx)sourceNames.add(""); sourcePositions.set(idx,pos); dataValues.set(idx,value); sourceNames.set(idx,name); text = value; sourceName = name; }
+        @Override public void unbindSource(int idx) { if(idx<sourcePositions.size()){sourcePositions.remove(idx);if(idx<dataValues.size())dataValues.remove(idx);if(idx<sourceNames.size())sourceNames.remove(idx);} }
     }
 
     private static class StaticTextEntry {
@@ -140,7 +147,7 @@ public class TerminalProConfigScreen extends Screen {
         this.terminalPos = BlockPos.of(data.getLong("TerminalPos"));
         this.layerPanel = new ProLayerPanel(this::onLayersChanged);
         this.colorPicker = new ProColorPicker(0xFFFFFF, 255, this::onColorConfirmed);
-        this.stylePanel = new DisplayStylePanel(this::onStyleParamChanged);
+        this.stylePanel = new DisplayStylePanel(this::onStyleParamChanged, this::commitDraft);
         this.animPanel = new AnimationPanel(this::onAnimChanged);
 
         // 加载图层
@@ -174,6 +181,22 @@ public class TerminalProConfigScreen extends Screen {
                 se.displayMax = st.getFloat("DisplayMax"); se.displayMin = st.getFloat("DisplayMin");
                 se.displayUnit = st.getString("DisplayUnit");
                 se.instanceId = st.getInt("SlotId");
+                // Read new format fields
+                if (st.contains("DisplayModeId")) try { se.displayModeId = ResourceLocation.parse(st.getString("DisplayModeId")); } catch (Exception ignored) {}
+                if (st.contains("ModeConfig")) se.modeConfig = com.github.haoyiyu.create_headsupdisplay.api.DisplayModeConfig.deserialize(st.getCompound("ModeConfig"));
+                else se.modeConfig = new com.github.haoyiyu.create_headsupdisplay.api.DisplayModeConfig(se.displayMax, se.displayMin, se.displayUnit);
+                se.sourcePositions.clear(); se.dataValues.clear(); se.sourceNames.clear();
+                if (st.contains("SourcePositions")) {
+                    var pl = st.getList("SourcePositions", CompoundTag.TAG_COMPOUND);
+                    var dl = st.contains("DataValues") ? st.getList("DataValues", CompoundTag.TAG_COMPOUND) : new ListTag();
+                    var nl = st.contains("SourceNames") ? st.getList("SourceNames", CompoundTag.TAG_COMPOUND) : new ListTag();
+                    for (int si = 0; si < pl.size(); si++) {
+                        se.sourcePositions.add(BlockPos.of(pl.getCompound(si).getLong("Pos")));
+                        se.dataValues.add(si < dl.size() ? dl.getCompound(si).getString("Val") : "");
+                        se.sourceNames.add(si < nl.size() ? nl.getCompound(si).getString("Name") : "");
+                    }
+                }
+                if (se.sourcePositions.isEmpty()) se.sourcePositions.add(se.sourcePos);
                 if (st.contains("SourceName")) se.sourceName = st.getString("SourceName");
                 if (st.contains("Animations")) {
                     var at = st.getList("Animations", net.minecraft.nbt.CompoundTag.TAG_COMPOUND);
@@ -305,24 +328,27 @@ public class TerminalProConfigScreen extends Screen {
             g.drawString(font, Component.translatable("gui.create_headsupdisplay.pro.edit_hint").getString(), tx + 2, ty + 16, 0xFF666688);
         }
 
-        // 图层面板
+        // 样式面板 (z=100 — 在拖拽卡片下方)
+        g.pose().pushPose();
+        g.pose().translate(0, 0, 100);
+        stylePanel.render(g, font, mx, my);
+        g.pose().popPose();
+
+        // 拖拽预览 (z=150)
+        if (dragMode == 4 && dockDragCard != null) {
+            g.pose().pushPose();
+            g.pose().translate(0, 0, 150);
+            int px = mx - CARD_W / 2; int py = my - CARD_H / 2;
+            g.fill(px, py, px + CARD_W, py + CARD_H, 0x88AAAAAA);
+            g.drawString(font, dockDragCard.name, px + 4, py + 4, 0xFFFFFF);
+            g.pose().popPose();
+        }
+
+        // 其他面板 (z=200)
         g.pose().pushPose();
         g.pose().translate(0, 0, 200);
         layerPanel.render(g, font, mx, my);
-        g.pose().popPose();
-        // 显示样式面板
-        g.pose().pushPose();
-        g.pose().translate(0, 0, 200);
-        stylePanel.render(g, font, mx, my);
-        g.pose().popPose();
-        // 动画面板
-        g.pose().pushPose();
-        g.pose().translate(0, 0, 200);
         animPanel.render(g, font, mx, my);
-        g.pose().popPose();
-        // 浮动调色板
-        g.pose().pushPose();
-        g.pose().translate(0, 0, 200);
         colorPicker.render(g, font, mx, my);
         g.pose().popPose();
         if (!colorPicker.isVisible()) colorEditTarget = null;
@@ -377,8 +403,8 @@ public class TerminalProConfigScreen extends Screen {
         x = drawToolBtn(g, mx, my, x, y, h, t("gui.create_headsupdisplay.pro.tool_text"), t("gui.create_headsupdisplay.pro.tool_text.tip"));
         boolean hasSelection = selectedElement != null;
         boolean isSlot = selectedElement instanceof SlotEntry;
-        String modeLabel = isSlot ? modeName(((SlotEntry)selectedElement).displayMode) : t("gui.create_headsupdisplay.pro.tool_mode");
-        x = drawToolBtn(g, mx, my, x, y, h, modeLabel, t("gui.create_headsupdisplay.pro.tool_mode.tip"), isSlot ? 0xFF446688 : 0xFF333344);
+        String modeLabel = t("gui.create_headsupdisplay.pro.tool_mode");
+        x = drawToolBtn(g, mx, my, x, y, h, modeLabel, t("gui.create_headsupdisplay.pro.tool_mode.tip"), 0xFF446688);
         x = drawToolBtn(g, mx, my, x, y, h, t("gui.create_headsupdisplay.pro.tool_color"), t("gui.create_headsupdisplay.pro.tool_color.tip"), hasSelection ? 0xFF4444AA : 0xFF333344);
         x = drawToolBtn(g, mx, my, x, y, h, t("gui.create_headsupdisplay.pro.tool_anim"), t("gui.create_headsupdisplay.pro.tool_anim.tip"), isSlot ? 0xFF448866 : 0xFF333344);
         x = drawToolBtn(g, mx, my, x, y, h, t("gui.create_headsupdisplay.pro.tool_delete"), t("gui.create_headsupdisplay.pro.tool_delete.tip"), hasSelection ? 0xFFFF4444 : 0xFF664444);
@@ -404,12 +430,21 @@ public class TerminalProConfigScreen extends Screen {
     }
 
     private int drawToolBtn(GuiGraphics g, int mx, int my, int x, int y, int barH, String label, String tooltip, int color) {
-        int w = font.width(label) + 8;
+        int w = btnW(label);
         boolean hover = mx >= x && mx <= x + w && my >= 0 && my <= barH;
         int bg = hover ? lighten(color) : color;
         g.fill(x, 1, x + w, barH - 1, bg);
         g.drawString(font, label, x + 4, y, 0xFFFFFFFF);
         return x + w + 2;
+    }
+
+    private int btnW(String label) { return font.width(label) + 8; }
+
+    private void commitDraft() {
+        if (draftEntry == null) return;
+        draftEntry.posX = width / 2 - 50; draftEntry.posY = height / 2 - 50;
+        allSlots.add(draftEntry); selectedElement = draftEntry; selectedType = 1;
+        playClick(); draftEntry = null; stylePanel.hide();
     }
 
     private int lighten(int c) {
@@ -503,15 +538,23 @@ public class TerminalProConfigScreen extends Screen {
             String text = slot.text.replaceAll("§[0-9a-fk-or]", "");
             int tc = (slot.alpha << 24) | (slot.color & 0xFFFFFF);
 
-            // gauge 尺寸
-            int gw = 100, gh = 80;
-            if (mode == 2 || mode == 5) { gw = 60; gh = 140; } // 高度计
-            else if (mode == 3) { gw = 90; gh = 90; } // 表盘
-            else if (mode == 4) { gw = 130; gh = 32; } // 数字
-            else if (mode == 1) { gw = 140; gh = 40; } // 进度条
-            // mode 0 text: 用原来的文字尺寸
-            int bw = mode == 0 ? Math.max(80, font.width(text.isEmpty() ? "[empty]" : text) + 16) : gw;
-            int bh = mode == 0 ? 20 : gh;
+            int bw, bh;
+            if (slot.displayModeId != null) {
+                var dm = com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.get(slot.displayModeId);
+                bw = dm != null ? dm.getDefaultWidth() : 80;
+                bh = dm != null ? dm.getDefaultHeight() : 20;
+            } else if (mode == 0) {
+                bw = Math.max(80, font.width(text.isEmpty() ? "[empty]" : text) + 16);
+                bh = 20;
+            } else {
+                // gauge 尺寸
+                int gw = 100, gh = 80;
+                if (mode == 2 || mode == 5) { gw = 60; gh = 140; }
+                else if (mode == 3) { gw = 90; gh = 90; }
+                else if (mode == 4) { gw = 130; gh = 32; }
+                else if (mode == 1) { gw = 140; gh = 40; }
+                bw = gw; bh = gh;
+            }
 
             g.pose().pushPose();
             g.pose().translate(slot.posX + bw * slot.scale / 2f, slot.posY + bh * slot.scale / 2f, 0);
@@ -519,7 +562,13 @@ public class TerminalProConfigScreen extends Screen {
             g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(slot.rotation));
             g.pose().translate(-bw / 2f, -bh / 2f, 0);
 
-            if (mode == 0) {
+            if (slot.displayModeId != null) {
+                var dm = com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.get(slot.displayModeId);
+                if (dm != null) {
+                    dm.renderPreview(g, font, slot.getDataValues(), slot.modeConfig, bw, bh);
+                    if (!onCurrent) g.fill(0, 0, bw, bh, 0x88000000);
+                }
+            } else if (mode == 0) {
                 // 文字模式：原有渲染
                 g.fill(0, 0, bw, bh, onCurrent ? 0xFF303050 : 0xFF1A1A30);
                 g.fill(0, 0, bw, 1, onCurrent ? 0xFF5050AA : 0xFF282850);
@@ -528,7 +577,7 @@ public class TerminalProConfigScreen extends Screen {
                 g.fill(0, 0, 4, bh, accent);
                 g.drawString(font, text.isEmpty() ? t("gui.create_headsupdisplay.pro.empty_slot") : text, 8, 4, onCurrent ? 0xFFFFFFFF : 0xFF888888);
             } else {
-                // gauge 模式：用 GaugeRenderer 直接渲染
+                // gauge 模式
                 int dim = onCurrent ? 0xFF : 0x44;
                 switch (mode) {
                     case 1 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderBar(
@@ -542,10 +591,7 @@ public class TerminalProConfigScreen extends Screen {
                     case 5 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderHudAltimeter(
                             g, font, text, dim << 24 | (tc & 0xFFFFFF), slot.displayMin, slot.displayMax, slot.displayUnit, bw, bh);
                 }
-                // 非当前图层加一层暗滤镜
-                if (!onCurrent) {
-                    g.fill(0, 0, bw, bh, 0x88000000);
-                }
+                if (!onCurrent) g.fill(0, 0, bw, bh, 0x88000000);
             }
             g.pose().popPose();
 
@@ -837,7 +883,7 @@ public class TerminalProConfigScreen extends Screen {
         x += 5; // separator 2
 
         // Aa btn
-        int aw = font.width(t("gui.create_headsupdisplay.pro.tool_text")) + 8;
+        int aw = btnW(t("gui.create_headsupdisplay.pro.tool_text"));
         if (mx >= x && mx <= x + aw && my >= 0 && my <= menuH) {
             playClick();
             StaticTextEntry e = new StaticTextEntry(t("gui.create_headsupdisplay.pro.new_text"), width / 2, height / 2);
@@ -849,18 +895,29 @@ public class TerminalProConfigScreen extends Screen {
         }
         x += aw + 2;
 
-        // Mode btn
-        String ml = selectedElement instanceof SlotEntry ? modeName(((SlotEntry)selectedElement).displayMode) : t("gui.create_headsupdisplay.pro.tool_mode");
-        int mw = font.width(ml) + 8;
-        if (mx >= x && mx <= x + mw && my >= 0 && my <= menuH && selectedElement instanceof SlotEntry se) {
+        // Mode btn — always opens creation panel
+        String ml = t("gui.create_headsupdisplay.pro.tool_mode");
+        int mw = btnW(ml);
+        if (mx >= x && mx <= x + mw && my >= 0 && my <= menuH) {
             playClick();
-            stylePanel.show(width / 2 - 140, 40, se);
+            if (draftEntry == null) {
+                var m = com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.get(0);
+                draftEntry = new SlotEntry(BlockPos.ZERO, currentLayer);
+                draftEntry.sourcePositions.clear(); draftEntry.dataValues.clear(); draftEntry.sourceNames.clear();
+                if (m != null) { draftEntry.setDisplayModeId(m.getId());
+                    for (var p : m.getConfigParameters()) { var cfg=draftEntry.modeConfig;
+                        switch(p.type()){case FLOAT->cfg.setFloat(p.key(),((Number)p.defaultValue()).floatValue());case INT->cfg.setInt(p.key(),((Number)p.defaultValue()).intValue());case STRING->cfg.setString(p.key(),(String)p.defaultValue());case BOOLEAN->cfg.setBoolean(p.key(),(Boolean)p.defaultValue());case COLOR->cfg.setInt(p.key(),((Number)p.defaultValue()).intValue());} } }
+            }
+            int dh = (int) Mth.lerp(dockAnim, DOCK_COLLAPSED, DOCK_HEIGHT);
+            int panelY = height - dh - 330; // panel above dock, never overlap
+            if (panelY < 30) panelY = 30;
+            stylePanel.show(width / 2 - 110, panelY, draftEntry);
             return true;
         }
         x += mw + 2;
 
         // Color btn
-        int cw = font.width(t("gui.create_headsupdisplay.pro.tool_color")) + 8;
+        int cw = btnW(t("gui.create_headsupdisplay.pro.tool_color"));
         if (mx >= x && mx <= x + cw && my >= 0 && my <= menuH && selectedElement != null) {
             playClick();
             int c = getElementColor(selectedElement);
@@ -871,7 +928,7 @@ public class TerminalProConfigScreen extends Screen {
         x += cw + 2;
 
         // Anim btn
-        int animW = font.width(t("gui.create_headsupdisplay.pro.tool_anim")) + 8;
+        int animW = btnW(t("gui.create_headsupdisplay.pro.tool_anim"));
         if (mx >= x && mx <= x + animW && my >= 0 && my <= menuH && selectedElement instanceof SlotEntry se) {
             playClick();
             animPanel.show(width / 2 - 150, 40, se.animations);
@@ -880,17 +937,16 @@ public class TerminalProConfigScreen extends Screen {
         x += animW + 2;
 
         // Delete btn
-        int dw = font.width(t("gui.create_headsupdisplay.pro.tool_delete")) + 8;
+        int dw = btnW(t("gui.create_headsupdisplay.pro.tool_delete"));
         if (mx >= x && mx <= x + dw && my >= 0 && my <= menuH) {
             playClick();
-            if (selectedElement != null) { deleteElement(selectedElement); selectedElement = null; }
-            return true;
+            if (selectedElement != null) { deleteElement(selectedElement); selectedElement = null; return true; }
         }
         x += dw + 2;
-        x += 4;  // gap
+        x += 4;  // gap — must match renderMenuBar
 
         // Save btn
-        int saveW = font.width(t("gui.create_headsupdisplay.pro.tool_save")) + 8;
+        int saveW = btnW(t("gui.create_headsupdisplay.pro.tool_save"));
         if (mx >= x && mx <= x + saveW && my >= 0 && my <= menuH) {
             playClick();
             saveAll();
@@ -1069,8 +1125,23 @@ public class TerminalProConfigScreen extends Screen {
             int dh = (int) Mth.lerp(dockAnim, DOCK_COLLAPSED, DOCK_HEIGHT);
             int canvasY = 0;
             int dockY = height - dh;
-            // 只接受落在画布上的释放（不能在坞内释放）
+            // 只接受落在画布/面板上的释放（不能在坞内释放）
             if (my > canvasY && my < dockY) {
+                // 优先：样式面板绑定区
+                if (stylePanel.isVisible() && draftEntry != null && dockDragCard.type == 0) {
+                    int bindIdx = stylePanel.bindZoneAt(mx, my);
+                    if (bindIdx >= 0) {
+                        var dm = com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.get(draftEntry.displayModeId);
+                        if (dm != null && dm.needsNumericData()
+                                && !DisplayStylePanel.isNumeric(dockDragCard.value)) {
+                            stylePanel.rejectBind(bindIdx);
+                        } else {
+                            draftEntry.bindSource(bindIdx, dockDragCard.sourcePos, dockDragCard.name, dockDragCard.value);
+                        }
+                        dockDragCard = null; dragMode = 0;
+                        return true;
+                    }
+                }
                 if (dockDragCard.type == 0 && dockDragCard.sourcePos != null
                         && !BlockPos.ZERO.equals(dockDragCard.sourcePos)) {
                     SlotEntry se = new SlotEntry(dockDragCard.sourcePos, currentLayer);
@@ -1106,6 +1177,7 @@ public class TerminalProConfigScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mx, double my, double sx, double sy) {
+        if (stylePanel.isVisible() && stylePanel.mouseScrolled(mx, my, sy)) return true;
         int dockH = (int) Mth.lerp(dockAnim, DOCK_COLLAPSED, DOCK_HEIGHT);
         int dockY = height - dockH;
 
@@ -1239,15 +1311,8 @@ public class TerminalProConfigScreen extends Screen {
         for (int i = allSlots.size() - 1; i >= 0; i--) {
             SlotEntry e = allSlots.get(i);
             if (isElementShown(e.layerIndex)) {
-                int bw, bh;
-                if (e.displayMode == 0) {
-                    bw = Math.max(80, font.width(e.text.isEmpty() ? "[empty]" : e.text) + 16);
-                    bh = 20;
-                } else {
-                    int[] gs = gaugeSize(e.displayMode);
-                    bw = gs[0]; bh = gs[1];
-                }
-                int w = (int)(bw * e.scale), h = (int)(bh * e.scale);
+                int[] sd = slotDisplaySize(e);
+                int w = (int)(sd[0] * e.scale), h = (int)(sd[1] * e.scale);
                 if (mx >= e.posX && mx <= e.posX + w && my >= e.posY && my <= e.posY + h) return e;
             }
         }
@@ -1256,15 +1321,8 @@ public class TerminalProConfigScreen extends Screen {
 
     private int[] getElementBounds(Object e) {
         if (e instanceof SlotEntry s) {
-            int bw, bh;
-            if (s.displayMode == 0) {
-                bw = Math.max(80, font.width(s.text.isEmpty() ? "[empty]" : s.text) + 16);
-                bh = 20;
-            } else {
-                int[] gs = gaugeSize(s.displayMode);
-                bw = gs[0]; bh = gs[1];
-            }
-            return new int[]{s.posX, s.posY, (int)(bw * s.scale), (int)(bh * s.scale)};
+            int[] sd = slotDisplaySize(s);
+            return new int[]{s.posX, s.posY, (int)(sd[0] * s.scale), (int)(sd[1] * s.scale)};
         }
         if (e instanceof StaticTextEntry s) {
             int bw = Math.max(60, font.width(s.text) + 16);
@@ -1355,8 +1413,8 @@ public class TerminalProConfigScreen extends Screen {
     private void deleteElement(Object e) {
         if (e instanceof SlotEntry s) {
             allSlots.remove(s);
-            PacketDistributor.sendToServer(new RemoveSlotPayload(terminalPos, s.sourcePos));
-            // sourceCards 不会被清除（refreshSourceCards 只增不减），卡片保留
+            if (!BlockPos.ZERO.equals(s.sourcePos))
+                PacketDistributor.sendToServer(new RemoveSlotPayload(terminalPos, s.sourcePos));
         } else if (e instanceof StaticTextEntry s) {
             int idx = staticTexts.indexOf(s);
             staticTexts.remove(s);
@@ -1388,14 +1446,14 @@ public class TerminalProConfigScreen extends Screen {
     }
 
     private void onStyleParamChanged(String param) {
-        if (!(selectedElement instanceof SlotEntry se)) return;
-        if (param.equals("mode")) return; // mode already set by panel
-        if (param.startsWith("max:")) {
-            try { se.displayMax = Float.parseFloat(param.substring(4)); } catch (NumberFormatException ignored) {}
-        } else if (param.startsWith("min:")) {
-            try { se.displayMin = Float.parseFloat(param.substring(4)); } catch (NumberFormatException ignored) {}
-        } else if (param.startsWith("unit:")) {
-            se.displayUnit = param.substring(5);
+        SlotEntry se = draftEntry; // params apply to the draft being edited
+        if (se == null) return;
+        if (param.equals("mode")) return;
+        int ci = param.indexOf(':');
+        if (ci <= 0) return;
+        String key = param.substring(0, ci), val = param.substring(ci + 1);
+        try { se.modeConfig.setFloat(key, Float.parseFloat(val)); } catch (NumberFormatException e) {
+            se.modeConfig.setString(key, val);
         }
     }
 
@@ -1482,14 +1540,38 @@ public class TerminalProConfigScreen extends Screen {
         t.putInt("Color", s.color); t.putInt("Alpha", s.alpha);
         t.putString("LastData", s.text); t.putInt("DisplayLine", s.displayLine);
         t.putInt("DisplayMode", s.displayMode);
-        t.putFloat("DisplayMax", s.displayMax); t.putFloat("DisplayMin", s.displayMin);
-        t.putString("DisplayUnit", s.displayUnit != null ? s.displayUnit : "");
+        t.putFloat("DisplayMax", s.modeConfig.getMax()); t.putFloat("DisplayMin", s.modeConfig.getMin());
+        t.putString("DisplayUnit", s.modeConfig.getUnit() != null ? s.modeConfig.getUnit() : "");
         t.putInt("SlotId", s.instanceId);
         if (s.sourceName != null) t.putString("SourceName", s.sourceName);
+        if (s.displayModeId != null) t.putString("DisplayModeId", s.displayModeId.toString());
+        t.put("ModeConfig", s.modeConfig.serialize());
+        if (!s.sourcePositions.isEmpty()) {
+            var pl=new net.minecraft.nbt.ListTag(); var dl=new net.minecraft.nbt.ListTag(); var nl=new net.minecraft.nbt.ListTag();
+            for (int i=0;i<s.sourcePositions.size();i++) {
+                var pt=new CompoundTag(); pt.putLong("Pos",s.sourcePositions.get(i).asLong()); pl.add(pt);
+                var dt=new CompoundTag(); dt.putString("Val",i<s.dataValues.size()&&s.dataValues.get(i)!=null?s.dataValues.get(i):""); dl.add(dt);
+                var nt=new CompoundTag(); nt.putString("Name",i<s.sourceNames.size()&&s.sourceNames.get(i)!=null?s.sourceNames.get(i):""); nl.add(nt);
+            }
+            t.put("SourcePositions",pl); t.put("DataValues",dl); t.put("SourceNames",nl);
+        }
         net.minecraft.nbt.ListTag animTag = new net.minecraft.nbt.ListTag();
         for (var a : s.animations) animTag.add(a.serialize());
         t.put("Animations", animTag);
         return t;
+    }
+
+    /** Unified size for rendering AND hit testing — uses registry if available, old gaugeSize as fallback */
+    private int[] slotDisplaySize(SlotEntry s) {
+        var m = resolveSlotMode(s);
+        if (m != null) return new int[]{m.getDefaultWidth(), m.getDefaultHeight()};
+        if (s.displayMode == 0) return new int[]{Math.max(80, font.width(s.text.isEmpty()?"[empty]":s.text)+16), 20};
+        return gaugeSize(s.displayMode);
+    }
+
+    private static com.github.haoyiyu.create_headsupdisplay.api.IDisplayMode resolveSlotMode(SlotEntry s) {
+        if (s.displayModeId != null) return com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.get(s.displayModeId);
+        return com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.get(s.displayMode);
     }
 
     private static int[] gaugeSize(int mode) {

@@ -1,8 +1,11 @@
 package com.github.haoyiyu.create_headsupdisplay.config;
 
+import com.github.haoyiyu.create_headsupdisplay.api.DisplayModeConfig;
+import com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.resources.ResourceLocation;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -23,6 +26,13 @@ public class DisplaySlot {
     private String sourceName;  // 数据源名称
     private final List<SlotAnimation> animations = new ArrayList<>();
 
+    // ── New mode system fields ──
+    private final List<BlockPos> sourcePositions = new ArrayList<>();
+    private final List<String> dataValues = new ArrayList<>();
+    private final List<String> sourceNames = new ArrayList<>();
+    private ResourceLocation displayModeId;
+    private DisplayModeConfig modeConfig = new DisplayModeConfig();
+
     public DisplaySlot(BlockPos sourcePos) {
         this.sourcePos = sourcePos;
         this.posX = 10;
@@ -36,6 +46,18 @@ public class DisplaySlot {
         this.displayUnit = "";
         this.rotation = 0f;
     }
+
+    // ── Multi-source ──
+    public List<BlockPos> getSourcePositions() { return sourcePositions; }
+    public List<String> getDataValues() { return dataValues; }
+    public List<String> getSourceNames() { return sourceNames; }
+    public void setDataValue(int idx, String v) { while(dataValues.size()<=idx)dataValues.add(""); dataValues.set(idx,v); }
+
+    // ── Mode ID ──
+    public ResourceLocation getDisplayModeId() { return displayModeId; }
+    public void setDisplayModeId(ResourceLocation id) { this.displayModeId = id; }
+    public DisplayModeConfig getModeConfig() { return modeConfig; }
+    public void setModeConfig(DisplayModeConfig c) { if(c!=null)this.modeConfig=c; }
 
     public BlockPos getSourcePos() { return sourcePos; }
     public int getPosX() { return posX; }
@@ -85,6 +107,18 @@ public class DisplaySlot {
         tag.putInt("Alpha", alpha);
         tag.putInt("SlotId", slotId);
         if (sourceName != null) tag.putString("SourceName", sourceName);
+        // New format
+        if (displayModeId != null) tag.putString("DisplayModeId", displayModeId.toString());
+        tag.put("ModeConfig", modeConfig.serialize());
+        if (!sourcePositions.isEmpty()) {
+            var pl=new ListTag(); var dl=new ListTag(); var nl=new ListTag();
+            for (int i=0;i<sourcePositions.size();i++) {
+                var pt=new CompoundTag(); pt.putLong("Pos",sourcePositions.get(i).asLong()); pl.add(pt);
+                var dt=new CompoundTag(); dt.putString("Val",i<dataValues.size()&&dataValues.get(i)!=null?dataValues.get(i):""); dl.add(dt);
+                var nt=new CompoundTag(); nt.putString("Name",i<sourceNames.size()&&sourceNames.get(i)!=null?sourceNames.get(i):""); nl.add(nt);
+            }
+            tag.put("SourcePositions",pl); tag.put("DataValues",dl); tag.put("SourceNames",nl);
+        }
         ListTag animTag = new ListTag();
         for (SlotAnimation a : animations) animTag.add(a.serialize());
         tag.put("Animations", animTag);
@@ -108,6 +142,20 @@ public class DisplaySlot {
         slot.color = tag.getInt("Color");
         slot.alpha = tag.getInt("Alpha");
         if (tag.contains("SourceName")) slot.sourceName = tag.getString("SourceName");
+        // New format
+        if (tag.contains("DisplayModeId")) { try{slot.displayModeId=ResourceLocation.parse(tag.getString("DisplayModeId"));}catch(Exception ignored){} }
+        if (tag.contains("ModeConfig")) slot.modeConfig = DisplayModeConfig.deserialize(tag.getCompound("ModeConfig"));
+        else { slot.modeConfig = new DisplayModeConfig(slot.displayMax, slot.displayMin, slot.displayUnit); }
+        if (tag.contains("SourcePositions")) {
+            var pl=tag.getList("SourcePositions",CompoundTag.TAG_COMPOUND);
+            var dl=tag.contains("DataValues")?tag.getList("DataValues",CompoundTag.TAG_COMPOUND):new ListTag();
+            var nl=tag.contains("SourceNames")?tag.getList("SourceNames",CompoundTag.TAG_COMPOUND):new ListTag();
+            for (int i=0;i<pl.size();i++) {
+                slot.sourcePositions.add(BlockPos.of(pl.getCompound(i).getLong("Pos")));
+                slot.dataValues.add(i<dl.size()?dl.getCompound(i).getString("Val"):"");
+                slot.sourceNames.add(i<nl.size()?nl.getCompound(i).getString("Name"):"");
+            }
+        }
         if (tag.contains("Animations")) {
             ListTag animTag = tag.getList("Animations", CompoundTag.TAG_COMPOUND);
             for (int i = 0; i < animTag.size(); i++)

@@ -227,18 +227,14 @@ public class HudOverlayRenderer {
                 g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(animRotation));
                 int tc = (animAlpha << 24) | (animColor & 0xFFFFFF);
                 String text = slot.text.replaceAll("§[0-9a-fk-or]", "");
-                switch (slot.displayMode) {
-                    case 1 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderBar(
-                            g, font, text, tc, slot.displayMax, slot.displayUnit, 120, 40);
-                    case 2 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderAltimeter(
-                            g, font, text, tc, slot.displayMin, slot.displayMax, slot.displayUnit, 80, 160);
-                    case 3 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderDial(
-                            g, font, text, tc, slot.displayMax, slot.displayUnit, 100, 100);
-                    case 4 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderDigital(
-                            g, font, text, tc, slot.displayUnit, 120, 28);
-                    case 5 -> com.github.haoyiyu.create_headsupdisplay.client.GaugeRenderer.renderHudAltimeter(
-                            g, font, text, tc, slot.displayMin, slot.displayMax, slot.displayUnit, 80, 160);
-                    default -> g.drawString(font, text, 0, 0, tc, true);
+                var mode = slot.displayModeId != null
+                    ? com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.get(slot.displayModeId)
+                    : com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.get(slot.displayMode);
+                if (mode != null) {
+                    mode.render(g, font, slot.dataValues, slot.modeConfig,
+                        mode.getDefaultWidth(), mode.getDefaultHeight());
+                } else {
+                    g.drawString(font, text, 0, 0, tc, true);
                 }
                 g.pose().popPose();
             }
