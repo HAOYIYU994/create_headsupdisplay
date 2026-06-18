@@ -1,6 +1,8 @@
 package com.github.haoyiyu.create_headsupdisplay.client;
 
+import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
 import com.github.haoyiyu.create_headsupdisplay.config.HudPositionConfig;
+import com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -120,6 +122,7 @@ public class ClientHudData {
         public final ResourceLocation displayModeId;
         public final com.github.haoyiyu.create_headsupdisplay.api.DisplayModeConfig modeConfig;
         public final java.util.List<String> dataValues;
+        public final java.util.List<String> sourceNames;
 
         public SlotRenderData(BlockPos sourcePos, int posX, int posY, float scale, String text, int displayLine,
                               int displayMode, float displayMax, float displayMin, String displayUnit,
@@ -127,7 +130,8 @@ public class ClientHudData {
                               java.util.List<com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation> animations,
                               ResourceLocation displayModeId,
                               com.github.haoyiyu.create_headsupdisplay.api.DisplayModeConfig modeConfig,
-                              java.util.List<String> dataValues) {
+                              java.util.List<String> dataValues,
+                              java.util.List<String> sourceNames) {
             this.sourcePos = sourcePos; this.posX = posX; this.posY = posY;
             this.scale = scale; this.text = text; this.displayLine = displayLine;
             this.displayMode = displayMode;
@@ -139,6 +143,7 @@ public class ClientHudData {
             this.displayModeId = displayModeId;
             this.modeConfig = modeConfig != null ? modeConfig : new com.github.haoyiyu.create_headsupdisplay.api.DisplayModeConfig(displayMax, displayMin, displayUnit);
             this.dataValues = dataValues != null ? dataValues : java.util.List.of(text);
+            this.sourceNames = sourceNames != null ? sourceNames : java.util.List.of();
         }
     }
 
@@ -148,11 +153,14 @@ public class ClientHudData {
         public final float scale, rotation;
         public final int color, alpha;
         public final boolean frozen;
+        public final List<SlotAnimation> animations;
 
-        public StaticTextRenderData(String text, int posX, int posY, float scale, float rotation, int color, int alpha, int layerIndex, boolean frozen) {
+        public StaticTextRenderData(String text, int posX, int posY, float scale, float rotation, int color, int alpha, int layerIndex, boolean frozen,
+                                    List<SlotAnimation> animations) {
             this.text = text; this.posX = posX; this.posY = posY;
             this.scale = scale; this.rotation = rotation; this.color = color; this.alpha = alpha;
             this.layerIndex = layerIndex; this.frozen = frozen;
+            this.animations = animations != null ? animations : List.of();
         }
     }
 
@@ -164,11 +172,14 @@ public class ClientHudData {
         public final float scale, rotation;
         public final int alpha;
         public final boolean frozen;
+        public final List<SlotAnimation> animations;
 
-        public ImageRenderData(UUID imageId, byte[] imageData, String fileName, int posX, int posY, float scale, float rotation, int alpha, int layerIndex, boolean frozen) {
+        public ImageRenderData(UUID imageId, byte[] imageData, String fileName, int posX, int posY, float scale, float rotation, int alpha, int layerIndex, boolean frozen,
+                               List<SlotAnimation> animations) {
             this.imageId = imageId; this.imageData = imageData; this.fileName = fileName;
             this.posX = posX; this.posY = posY; this.scale = scale; this.rotation = rotation;
             this.alpha = alpha; this.layerIndex = layerIndex; this.frozen = frozen;
+            this.animations = animations != null ? animations : List.of();
         }
     }
 
@@ -177,11 +188,20 @@ public class ClientHudData {
         public final float scale, rotation;
         public final int alpha, radarRange;
         public final boolean frozen;
+        public final List<SlotAnimation> animations;
 
-        public RadarRenderData(int posX, int posY, float scale, float rotation, int alpha, int range, int layerIndex, boolean frozen) {
+        public RadarRenderData(int posX, int posY, float scale, float rotation, int alpha, int range, int layerIndex, boolean frozen,
+                               List<SlotAnimation> animations) {
             this.posX = posX; this.posY = posY; this.scale = scale; this.rotation = rotation;
             this.alpha = alpha; this.radarRange = range; this.layerIndex = layerIndex; this.frozen = frozen;
+            this.animations = animations != null ? animations : List.of();
         }
+    }
+
+    private static List<SlotAnimation> readAnims(CompoundTag tag) {
+        var list = new ArrayList<SlotAnimation>();
+        com.github.haoyiyu.create_headsupdisplay.config.AnimationIO.read(tag, list);
+        return list;
     }
 
     // ========== 内部数据容器 ==========
@@ -211,11 +231,7 @@ public class ClientHudData {
                     BlockPos sp = BlockPos.of(tag.getLong("sourcePos"));
                     int li = tag.getInt("layerIndex");
                     var anims = new java.util.ArrayList<com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation>();
-                    if (tag.contains("Animations")) {
-                        var at = tag.getList("Animations", net.minecraft.nbt.CompoundTag.TAG_COMPOUND);
-                        for (int ai = 0; ai < at.size(); ai++)
-                            anims.add(com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation.deserialize(at.getCompound(ai)));
-                    }
+                    com.github.haoyiyu.create_headsupdisplay.config.AnimationIO.read(tag, anims);
                     ResourceLocation dmId = null;
                     if (tag.contains("DisplayModeId")) try { dmId = ResourceLocation.parse(tag.getString("DisplayModeId")); } catch (Exception ignored) {}
                     com.github.haoyiyu.create_headsupdisplay.api.DisplayModeConfig cfg = null;
@@ -227,12 +243,19 @@ public class ClientHudData {
                         for (int di = 0; di < dvt.size(); di++) list.add(dvt.getCompound(di).getString("Val"));
                         if (!list.isEmpty()) dv = list;
                     }
+                    java.util.List<String> sn = java.util.List.of();
+                    if (tag.contains("SourceNames")) {
+                        var snt = tag.getList("SourceNames", CompoundTag.TAG_COMPOUND);
+                        var list = new java.util.ArrayList<String>();
+                        for (int di = 0; di < snt.size(); di++) list.add(snt.getCompound(di).getString("Nm"));
+                        if (!list.isEmpty()) sn = list;
+                    }
                     slots.add(new SlotRenderData(sp, tag.getInt("posX"), tag.getInt("posY"),
                             tag.getFloat("scale"), tag.getString("text"), tag.getInt("displayLine"),
                             tag.getInt("DisplayMode"), tag.getFloat("DisplayMax"), tag.getFloat("DisplayMin"),
                             tag.getString("DisplayUnit"),
                             tag.getFloat("rotation"), tag.getInt("color"), tag.getInt("alpha"),
-                            li, frozenMap.getOrDefault(li, false), anims, dmId, cfg, dv));
+                            li, frozenMap.getOrDefault(li, false), anims, dmId, cfg, dv, sn));
                 }
             }
             if (data.contains("staticCount")) {
@@ -243,7 +266,7 @@ public class ClientHudData {
                     staticTexts.add(new StaticTextRenderData(tag.getString("text"),
                             tag.getInt("posX"), tag.getInt("posY"), tag.getFloat("scale"),
                             tag.getFloat("rotation"), tag.getInt("color"), tag.getInt("alpha"),
-                            li, frozenMap.getOrDefault(li, false)));
+                            li, frozenMap.getOrDefault(li, false), readAnims(tag)));
                 }
             }
             if (data.contains("imageCount")) {
@@ -255,7 +278,7 @@ public class ClientHudData {
                     images.add(new ImageRenderData(id, bytes, tag.getString("FileName"),
                             tag.getInt("PosX"), tag.getInt("PosY"), tag.getFloat("Scale"),
                             tag.getFloat("Rotation"), tag.getInt("Alpha"),
-                            li, frozenMap.getOrDefault(li, false)));
+                            li, frozenMap.getOrDefault(li, false), readAnims(tag)));
                     DynamicTextureCache.ensureUpdated(id, bytes);
                 }
             }
@@ -267,7 +290,7 @@ public class ClientHudData {
                     radarSlots.add(new RadarRenderData(tag.getInt("PosX"), tag.getInt("PosY"),
                             tag.getFloat("Scale"), tag.getFloat("Rotation"),
                             tag.getInt("Alpha"), tag.getInt("RadarRange"),
-                            li, frozenMap.getOrDefault(li, false)));
+                            li, frozenMap.getOrDefault(li, false), readAnims(tag)));
                 }
             }
         }

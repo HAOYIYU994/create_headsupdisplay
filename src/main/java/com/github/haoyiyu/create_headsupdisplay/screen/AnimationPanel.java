@@ -10,9 +10,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
 
-/** 动画编辑器 — 时间线 + 关键帧编辑 */
+/** 动画编辑器 — 时间线 + 关键帧编辑 + 触发源选择 */
 public class AnimationPanel {
-    private static final int PANEL_W = 320;
+    private static final int PANEL_W = 370;
     private static final int ROW_H = 14;
     private static final int TIMELINE_H = 20;
 
@@ -22,15 +22,19 @@ public class AnimationPanel {
     private boolean draggingKf;
 
     private List<SlotAnimation> animations = new ArrayList<>();
+    private final List<String> availableSourceNames = new ArrayList<>();
     private int selectedAnim = -1;
     private int selectedKf = -1;
     private final Consumer<String> onChange;
 
     public AnimationPanel(Consumer<String> onChange) { this.onChange = onChange; }
 
-    public void show(int x, int y, List<SlotAnimation> anims) {
+    public void show(int x, int y, List<SlotAnimation> anims, List<String> sourceNames) {
         panelX = x; panelY = y; visible = true;
         animations = anims;
+        availableSourceNames.clear();
+        availableSourceNames.add(""); // empty = self
+        if (sourceNames != null) availableSourceNames.addAll(sourceNames);
         selectedAnim = anims.isEmpty() ? -1 : 0;
         selectedKf = -1;
     }
@@ -67,18 +71,24 @@ public class AnimationPanel {
         ry += ROW_H + 4;
         if (a == null) { g.drawString(font, t("gui.create_headsupdisplay.pro.anim.no_anims"), panelX + 6, ry, 0xFF8888AA); return; }
 
-        // 触发与周期 — 并排显示
+        // 触发源选择（卡片拖拽式）+ 触发条件 + 周期
         String[] tk = {"gui.create_headsupdisplay.pro.anim.trigger_always","gui.create_headsupdisplay.pro.anim.trigger_above","gui.create_headsupdisplay.pro.anim.trigger_below","gui.create_headsupdisplay.pro.anim.trigger_between"};
         String trig = t(tk[a.trigger.ordinal()]);
+        String srcLabel = a.triggerSourceName.isEmpty() ? t("gui.create_headsupdisplay.pro.anim.src_self") : a.triggerSourceName;
         String cyc = String.format("%.1fs", a.cycleTime);
-        drawBtn(g, font, mx, my, panelX + 2, ry, 72, t("gui.create_headsupdisplay.pro.anim.trigger") + " " + trig);
-        drawBtn(g, font, mx, my, panelX + 76, ry, 72, t("gui.create_headsupdisplay.pro.anim.cycle") + " " + cyc);
-        drawBtn(g, font, mx, my, panelX + 150, ry, 48, t("gui.create_headsupdisplay.pro.anim.loop") + ": " + (a.loop ? "↻" : "→"));
+        drawBtn(g, font, mx, my, panelX + 2, ry, 80, t("gui.create_headsupdisplay.pro.anim.trigger") + " " + trig);
+        drawBtn(g, font, mx, my, panelX + 84, ry, 68, t("gui.create_headsupdisplay.pro.anim.src") + ":" + (srcLabel.length() > 7 ? srcLabel.substring(0,6)+"." : srcLabel));
+        drawBtn(g, font, mx, my, panelX + 154, ry, 68, t("gui.create_headsupdisplay.pro.anim.cycle") + " " + cyc);
+        drawBtn(g, font, mx, my, panelX + 224, ry, 36, t("gui.create_headsupdisplay.pro.anim.loop") + ": " + (a.loop ? "↻" : "→"));
+        ry += ROW_H + 2;
+        // End behavior — always visible so user can pre-edit before picking a trigger
+        String eb = t("gui.create_headsupdisplay.pro.anim.end_" + a.endBehavior.name().toLowerCase());
+        drawBtn(g, font, mx, my, panelX + 2, ry, 68, t("gui.create_headsupdisplay.pro.anim.end") + ":" + eb);
         if (a.trigger != SlotAnimation.TriggerType.ALWAYS) {
             float v1 = a.triggerValue1;
-            drawBtn(g, font, mx, my, panelX + 200, ry, 48, "V1:" + String.format("%.0f", v1));
+            drawBtn(g, font, mx, my, panelX + 72, ry, 48, "V1:" + String.format("%.0f", v1));
             if (a.trigger == SlotAnimation.TriggerType.DATA_BETWEEN) {
-                drawBtn(g, font, mx, my, panelX + 250, ry, 48, "V2:" + String.format("%.0f", a.triggerValue2));
+                drawBtn(g, font, mx, my, panelX + 122, ry, 48, "V2:" + String.format("%.0f", a.triggerValue2));
             }
         }
         ry += ROW_H + 2;
@@ -167,23 +177,38 @@ public class AnimationPanel {
         SlotAnimation a = animations.get(selectedAnim);
 
         // Trigger
-        if (mx >= panelX + 2 && mx <= panelX + 74 && my >= ry && my <= ry + ROW_H) {
+        if (mx >= panelX + 2 && mx <= panelX + 82 && my >= ry && my <= ry + ROW_H) {
             a.trigger = SlotAnimation.TriggerType.values()[(a.trigger.ordinal() + 1) % 4]; onChange.accept("trigger"); return true;
         }
+        // Source
+        if (mx >= panelX + 84 && mx <= panelX + 152 && my >= ry && my <= ry + ROW_H) {
+            if (!availableSourceNames.isEmpty()) {
+                int curIdx = availableSourceNames.indexOf(a.triggerSourceName);
+                if (curIdx < 0) curIdx = 0;
+                a.triggerSourceName = availableSourceNames.get((curIdx + 1) % availableSourceNames.size());
+                onChange.accept("src"); return true;
+            }
+        }
         // Cycle
-        if (mx >= panelX + 76 && mx <= panelX + 148 && my >= ry && my <= ry + ROW_H) {
+        if (mx >= panelX + 154 && mx <= panelX + 222 && my >= ry && my <= ry + ROW_H) {
             a.cycleTime = a.cycleTime >= 5f ? 0.5f : a.cycleTime + 0.5f; onChange.accept("cycle"); return true;
         }
         // Loop
-        if (mx >= panelX + 150 && mx <= panelX + 198 && my >= ry && my <= ry + ROW_H) {
+        if (mx >= panelX + 224 && mx <= panelX + 260 && my >= ry && my <= ry + ROW_H) {
             a.loop = !a.loop; onChange.accept("loop"); return true;
         }
-        // V1 / V2
-        if (a.trigger != SlotAnimation.TriggerType.ALWAYS && mx >= panelX + 200 && mx <= panelX + 248 && my >= ry && my <= ry + ROW_H) {
-            a.triggerValue1 += (button == 0 ? 10 : -10); if (a.triggerValue1 < 0) a.triggerValue1 = 0; onChange.accept("v1"); return true;
+        ry += ROW_H + 2;
+        // End behavior — always clickable
+        if (mx >= panelX + 2 && mx <= panelX + 70 && my >= ry && my <= ry + ROW_H) {
+            a.endBehavior = SlotAnimation.EndBehavior.values()[(a.endBehavior.ordinal() + 1) % 4]; onChange.accept("end"); return true;
         }
-        if (a.trigger == SlotAnimation.TriggerType.DATA_BETWEEN && mx >= panelX + 250 && mx <= panelX + 298 && my >= ry && my <= ry + ROW_H) {
-            a.triggerValue2 += (button == 0 ? 10 : -10); if (a.triggerValue2 < 0) a.triggerValue2 = 0; onChange.accept("v2"); return true;
+        if (a.trigger != SlotAnimation.TriggerType.ALWAYS) {
+            if (mx >= panelX + 72 && mx <= panelX + 120 && my >= ry && my <= ry + ROW_H) {
+                a.triggerValue1 += (button == 0 ? 10 : -10); if (a.triggerValue1 < 0) a.triggerValue1 = 0; onChange.accept("v1"); return true;
+            }
+            if (a.trigger == SlotAnimation.TriggerType.DATA_BETWEEN && mx >= panelX + 122 && mx <= panelX + 170 && my >= ry && my <= ry + ROW_H) {
+                a.triggerValue2 += (button == 0 ? 10 : -10); if (a.triggerValue2 < 0) a.triggerValue2 = 0; onChange.accept("v2"); return true;
+            }
         }
         ry += ROW_H + 2;
 
@@ -247,6 +272,12 @@ public class AnimationPanel {
             a.keyframes.add(k); selectedKf = a.keyframes.size() - 1;
             onChange.accept("capture:" + selectedAnim + ":" + (a.keyframes.size() - 1));
             return true;
+        }
+        // Absorb any click inside the panel bounds so it doesn't fall through
+        {
+            SlotAnimation aa = selectedAnim >= 0 && selectedAnim < animations.size() ? animations.get(selectedAnim) : null;
+            int ph = 16 + ROW_H + 4 + (aa != null ? 8 * ROW_H + TIMELINE_H + aa.keyframes.size() * ROW_H : 0) + 4;
+            if (mx >= panelX && mx <= panelX + PANEL_W && my >= panelY && my <= panelY + ph) return true;
         }
         return false;
     }

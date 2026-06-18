@@ -2,12 +2,9 @@ package com.github.haoyiyu.create_headsupdisplay.network;
 
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalProBlockEntity;
-import com.github.haoyiyu.create_headsupdisplay.client.ClientHudData;
-import com.github.haoyiyu.create_headsupdisplay.screen.TerminalConfigScreen;
-import com.github.haoyiyu.create_headsupdisplay.screen.TerminalProConfigScreen;
-import net.minecraft.client.Minecraft;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
+import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
@@ -17,37 +14,10 @@ public class NetworkHandler {
 
     @SubscribeEvent
     public static void register(final RegisterPayloadHandlersEvent event) {
-        if (registered) {
-            return;
-        }
+        if (registered) return;
         registered = true;
 
         final PayloadRegistrar registrar = event.registrar("1");
-
-        // 同步显示数据（服务端 -> 客户端）
-        registrar.playToClient(
-                SyncDisplayDataPayload.TYPE,
-                SyncDisplayDataPayload.CODEC,
-                (payload, context) -> context.enqueueWork(() -> ClientHudData.updateDisplayData(payload.data()))
-        );
-
-        // 打开终端配置屏幕（服务端 -> 客户端）
-        registrar.playToClient(
-                OpenTerminalConfigScreenPayload.TYPE,
-                OpenTerminalConfigScreenPayload.CODEC,
-                (payload, context) -> context.enqueueWork(() -> {
-                    Minecraft.getInstance().setScreen(new TerminalConfigScreen(payload.slotsData()));
-                })
-        );
-
-        // 打开专业版终端配置屏幕（服务端 -> 客户端）
-        registrar.playToClient(
-                OpenTerminalProConfigScreenPayload.TYPE,
-                OpenTerminalProConfigScreenPayload.CODEC,
-                (payload, context) -> context.enqueueWork(() -> {
-                    Minecraft.getInstance().setScreen(new TerminalProConfigScreen(payload.slotsData()));
-                })
-        );
 
         // 更新槽位配置（客户端 -> 服务端）
         registrar.playToServer(
@@ -250,13 +220,6 @@ public class NetworkHandler {
         );
 
         // ========== 雷达系统网络包 ==========
-        // 同步雷达轨迹数据（服务端 -> 客户端）
-        registrar.playToClient(
-                SyncRadarDataPayload.TYPE,
-                SyncRadarDataPayload.CODEC,
-                (payload, context) -> context.enqueueWork(() -> ClientHudData.updateRadarTracks(payload.tracks(), payload.sweepAngle(), payload.radarRange(), payload.radarX(), payload.radarY(), payload.radarZ()))
-        );
-
         // 添加雷达槽位（客户端 -> 服务端）
         registrar.playToServer(
                 AddRadarSlotPayload.TYPE,
@@ -311,5 +274,52 @@ public class NetworkHandler {
                 UpdateNbtReaderConfigPayload::handle
         );
 
+        // ========== Client-only registrations (crash on dedicated server) ==========
+        if (FMLEnvironment.dist.isClient()) registerClientPayloads(registrar);
+    }
+
+    private static void registerClientPayloads(PayloadRegistrar registrar) {
+        registrar.playToClient(
+                com.github.haoyiyu.create_headsupdisplay.network.SyncDisplayDataPayload.TYPE,
+                com.github.haoyiyu.create_headsupdisplay.network.SyncDisplayDataPayload.CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                    com.github.haoyiyu.create_headsupdisplay.client.ClientHudData.updateDisplayData(payload.data()))
+        );
+        registrar.playToClient(
+                com.github.haoyiyu.create_headsupdisplay.network.OpenTerminalConfigScreenPayload.TYPE,
+                com.github.haoyiyu.create_headsupdisplay.network.OpenTerminalConfigScreenPayload.CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                    net.minecraft.client.Minecraft.getInstance().setScreen(
+                        new com.github.haoyiyu.create_headsupdisplay.screen.TerminalConfigScreen(payload.slotsData())))
+        );
+        registrar.playToClient(
+                com.github.haoyiyu.create_headsupdisplay.network.OpenTerminalProConfigScreenPayload.TYPE,
+                com.github.haoyiyu.create_headsupdisplay.network.OpenTerminalProConfigScreenPayload.CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                    net.minecraft.client.Minecraft.getInstance().setScreen(
+                        new com.github.haoyiyu.create_headsupdisplay.screen.TerminalProConfigScreen(payload.slotsData())))
+        );
+        registrar.playToClient(
+                com.github.haoyiyu.create_headsupdisplay.network.OpenOmniCoreScreenPayload.TYPE,
+                com.github.haoyiyu.create_headsupdisplay.network.OpenOmniCoreScreenPayload.CODEC,
+                com.github.haoyiyu.create_headsupdisplay.network.OpenOmniCoreScreenPayload::handle
+        );
+        registrar.playToClient(
+                com.github.haoyiyu.create_headsupdisplay.network.SyncSourcesDataPayload.TYPE,
+                com.github.haoyiyu.create_headsupdisplay.network.SyncSourcesDataPayload.CODEC,
+                com.github.haoyiyu.create_headsupdisplay.network.SyncSourcesDataPayload::handle
+        );
+        registrar.playToClient(
+                com.github.haoyiyu.create_headsupdisplay.network.OpenFrequencySelectionPayload.TYPE,
+                com.github.haoyiyu.create_headsupdisplay.network.OpenFrequencySelectionPayload.CODEC,
+                com.github.haoyiyu.create_headsupdisplay.network.OpenFrequencySelectionPayload::handle
+        );
+        registrar.playToClient(
+                com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.TYPE,
+                com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.CODEC,
+                (payload, context) -> context.enqueueWork(() ->
+                    com.github.haoyiyu.create_headsupdisplay.client.ClientHudData.updateRadarTracks(
+                        payload.tracks(), payload.sweepAngle(), payload.radarRange(), payload.radarX(), payload.radarY(), payload.radarZ()))
+        );
     }
 }

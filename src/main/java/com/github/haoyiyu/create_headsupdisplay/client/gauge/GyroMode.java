@@ -12,16 +12,9 @@ import java.util.List;
 
 /**
  * Artificial horizon / attitude indicator.
- * 2 data sources: [0]=pitch (-90..90), [1]=roll (degrees).
- *
- * Design:
- *   Moving layer (rotated by roll, shifted by pitch):
- *     - Sky/ground fills + horizon line
- *     - Infinite pitch ladder ticks + labels
- *   Fixed layer (drawn after):
- *     - Aircraft symbol at center
- *     - Yellow reference wings
- *     - Outer ring (roll scale + cardinal marks) — clips everything naturally
+ * 2 data sources: [0]=pitch (-180..180), [1]=roll (degrees).
+ * Folds pitch at ±90° and compensates roll so the horizon stays continuous
+ * through the vertical — the same math real attitude indicators use.
  */
 public class GyroMode implements IDisplayMode {
     public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath(CreateHeadsUpDisplay.MOD_ID, "gyro");
@@ -36,11 +29,20 @@ public class GyroMode implements IDisplayMode {
 
     @Override
     public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h) {
-        float pitch = GaugeUtil.parseFloat(dataValues.size()>0 ? dataValues.get(0) : "0");
-        float roll  = dataValues.size()>1 ? GaugeUtil.parseFloat(dataValues.get(1)) : 0;
+        float rawPitch = GaugeUtil.parseFloat(dataValues.size()>0 ? dataValues.get(0) : "0");
+        float rawRoll  = dataValues.size()>1 ? GaugeUtil.parseFloat(dataValues.get(1)) : 0;
         int cx = w/2, cy = h/2, r = Math.min(w,h)/2 - 6;
         float pxPerDeg = 2.0f;
         int degStep = 10;
+
+        // Fold pitch into [-90,90] for display, compensating roll.
+        // Example: pitch=120° → folded to 60°, roll +=180° (past vertical = inverted horizon)
+        float pitch = rawPitch;
+        float roll  = rawRoll;
+        if (pitch > 90f)  { pitch = 180f - pitch;  roll += 180f; }
+        if (pitch < -90f) { pitch = -180f - pitch; roll += 180f; }
+        pitch = Mth.clamp(pitch, -89.5f, 89.5f);
+
         RenderSystem.enableBlend();
 
         // ═══════════════════════════════════════════
@@ -85,10 +87,5 @@ public class GyroMode implements IDisplayMode {
         g.fill(cx - r + 6, cy - 1, cx + r - 5, cy + 2, 0x6666AA00);
 
         RenderSystem.disableBlend();
-    }
-
-    private static void line(GuiGraphics g, int x1, int y1, int x2, int y2, int c) {
-        int dx=Math.abs(x2-x1), dy=-Math.abs(y2-y1), sx=x1<x2?1:-1, sy=y1<y2?1:-1, err=dx+dy;
-        while(true){g.fill(x1,y1,x1+1,y1+1,c);if(x1==x2&&y1==y2)break;int e2=2*err;if(e2>=dy){err+=dy;x1+=sx;}if(e2<=dx){err+=dx;y1+=sy;}}
     }
 }

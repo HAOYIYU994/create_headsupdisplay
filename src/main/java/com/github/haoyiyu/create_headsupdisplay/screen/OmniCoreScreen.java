@@ -9,6 +9,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -98,7 +99,8 @@ public class OmniCoreScreen extends Screen {
             }
             if (srcTag.contains("translation")) {
                 entry.transConfig = TranslationConfig.deserialize(srcTag.getCompound("translation"));
-                entry.trans = true;
+                entry.trans = entry.transConfig.getMode() != TranslationConfig.Mode.NONE;
+                entry.hasRegex = !entry.transConfig.getRegexPattern().isEmpty();
             }
             sources.add(entry);
         }
@@ -200,6 +202,10 @@ public class OmniCoreScreen extends Screen {
     public void render(GuiGraphics graphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(graphics, mouseX, mouseY, partialTick);
         super.render(graphics, mouseX, mouseY, partialTick);
+
+        // 标题
+        graphics.drawCenteredString(font, Component.translatable("gui.create_headsupdisplay.omni_core.title").getString(),
+                width / 2, 4, 0xFFCCCCFF);
 
         // ===== 左下角：终端列表（宽度与按钮一致 100px） =====
         int termW = 100;
@@ -322,16 +328,33 @@ public class OmniCoreScreen extends Screen {
                     int detailBtnX = width - 120;
                     graphics.fill(detailBtnX, y, detailBtnX + 30, y + 20, 0xAA4444AA);
                     graphics.drawString(font, "D", detailBtnX + 11, y + 6, 0xFFFFFF);
+                    int sendBtnX = width - 80;
+                    graphics.fill(sendBtnX, y, sendBtnX + 30, y + 20, 0xAA00AA00);
+                    graphics.drawString(font, Component.translatable("gui.create_headsupdisplay.send").getString(), sendBtnX + 5, y + 6, 0xFFFFFF);
                 } else if (src.isRadar) {
-                } else if (src.dlText == null) {
+                    int sendBtnX = width - 80;
+                    graphics.fill(sendBtnX, y, sendBtnX + 30, y + 20, 0xAA00AA00);
+                    graphics.drawString(font, Component.translatable("gui.create_headsupdisplay.send").getString(), sendBtnX + 5, y + 6, 0xFFFFFF);
+                } else if (src.dlText != null) {
+                    // DisplayLink: regex + translation buttons
+                    int rxBtnX = width - 124;
+                    graphics.fill(rxBtnX, y, rxBtnX + 24, y + 20, src.hasRegex ? 0xAA66CC66 : 0xAA335533);
+                    graphics.drawString(font, "R", rxBtnX + 8, y + 6, 0xFFFFFF);
+                    int transBtnX = width - 96;
+                    graphics.fill(transBtnX, y, transBtnX + 24, y + 20, src.trans ? 0xAAFFA500 : 0xAA555555);
+                    graphics.drawString(font, "T", transBtnX + 8, y + 6, 0xFFFFFF);
+                    int sendBtnX = width - 68;
+                    graphics.fill(sendBtnX, y, sendBtnX + 24, y + 20, 0xAA00AA00);
+                    graphics.drawString(font, Component.translatable("gui.create_headsupdisplay.send").getString(), sendBtnX + 5, y + 6, 0xFFFFFF);
+                } else {
+                    // Redstone: translation only
                     int transBtnX = width - 120;
                     graphics.fill(transBtnX, y, transBtnX + 30, y + 20, src.trans ? 0xAAFFA500 : 0xAA555555);
                     graphics.drawString(font, "T", transBtnX + 11, y + 6, 0xFFFFFF);
+                    int sendBtnX = width - 80;
+                    graphics.fill(sendBtnX, y, sendBtnX + 30, y + 20, 0xAA00AA00);
+                    graphics.drawString(font, Component.translatable("gui.create_headsupdisplay.send").getString(), sendBtnX + 5, y + 6, 0xFFFFFF);
                 }
-
-                int sendBtnX = width - 80;
-                graphics.fill(sendBtnX, y, sendBtnX + 30, y + 20, 0xAA00AA00);
-                graphics.drawString(font, Component.translatable("gui.create_headsupdisplay.send").getString(), sendBtnX + 5, y + 6, 0xFFFFFF);
             }
 
             int delBtnX = width - 40;
@@ -396,30 +419,50 @@ public class OmniCoreScreen extends Screen {
                 Minecraft.getInstance().setScreen(new ImageDetailScreen(entry));
                 return true;
             }
-            if (!sources.get(i).isImage && !sources.get(i).isRadar && sources.get(i).dlText == null && mouseX >= width - 120 && mouseX <= width - 90 && mouseY >= y && mouseY <= y + 20) {
+            // DisplayLink: Regex button
+            if (sources.get(i).dlText != null && !sources.get(i).isImage && !sources.get(i).isRadar
+                    && mouseX >= width - 124 && mouseX <= width - 100 && mouseY >= y && mouseY <= y + 20) {
                 final int idx = i;
                 SourceEntry entry = sources.get(idx);
                 TranslationConfig tc = entry.transConfig != null ? entry.transConfig : new TranslationConfig();
-                List<String> refNames = new ArrayList<>();
-                List<String> imgNames = new ArrayList<>();
-                for (int j = 0; j < sources.size(); j++) {
-                    SourceEntry se = sources.get(j);
-                    if (j != idx && !se.isRadar && se.name != null && !se.name.isEmpty()) {
-                        refNames.add(se.name);
-                    }
-                    if (se.isImage && se.name != null && !se.name.isEmpty()
-                            && se.imageData != null && se.imageData.length > 0) {
-                        imgNames.add(se.name);
-                    }
-                }
-                Minecraft.getInstance().setScreen(new TranslationScreen(tc, config -> {
-                    entry.transConfig = config;
-                    entry.trans = config.getMode() != TranslationConfig.Mode.NONE;
-                    PacketDistributor.sendToServer(new UpdateTranslationPayload(corePos, idx, config.serialize()));
-                }, refNames, imgNames));
+                Minecraft.getInstance().setScreen(new RegexConfigScreen(
+                    tc.getRegexPattern(), tc.getRegexReplacement(),
+                    (pat, rep) -> {
+                        tc.setRegexPattern(pat);
+                        tc.setRegexReplacement(rep);
+                        entry.transConfig = tc;
+                        entry.hasRegex = !pat.isEmpty();
+                        PacketDistributor.sendToServer(new UpdateTranslationPayload(corePos, idx, tc.serialize()));
+                    }));
                 return true;
             }
-            if (mouseX >= width - 80 && mouseX <= width - 50 && mouseY >= y && mouseY <= y + 20) {
+            // DisplayLink: Translation button
+            if (sources.get(i).dlText != null && !sources.get(i).isImage && !sources.get(i).isRadar
+                    && mouseX >= width - 96 && mouseX <= width - 72 && mouseY >= y && mouseY <= y + 20) {
+                final int idx = i;
+                SourceEntry entry = sources.get(idx);
+                openTranslationScreen(idx, entry);
+                return true;
+            }
+            // Image detail button
+            if (sources.get(i).isImage && hasImagePlugin && mouseX >= width - 120 && mouseX <= width - 90 && mouseY >= y && mouseY <= y + 20) {
+                final int idx = i;
+                SourceEntry entry = sources.get(idx);
+                Minecraft.getInstance().setScreen(new ImageDetailScreen(entry));
+                return true;
+            }
+            // Redstone: Translation button
+            if (!sources.get(i).isImage && !sources.get(i).isRadar && sources.get(i).dlText == null
+                    && mouseX >= width - 120 && mouseX <= width - 90 && mouseY >= y && mouseY <= y + 20) {
+                final int idx = i;
+                SourceEntry entry = sources.get(idx);
+                openTranslationScreen(idx, entry);
+                return true;
+            }
+            // Send button (different positions per source type)
+            int sendLeft = sources.get(i).dlText != null && !sources.get(i).isImage && !sources.get(i).isRadar ? width - 68 :
+                           sources.get(i).isImage || sources.get(i).isRadar || sources.get(i).dlText == null ? width - 80 : width - 80;
+            if (mouseX >= sendLeft && mouseX <= sendLeft + 24 && mouseY >= y && mouseY <= y + 20) {
                 SourceEntry se = sources.get(i);
                 boolean unsup = (se.isImage && !hasImagePlugin) || (se.isRadar && !hasRadarPlugin);
                 if (!unsup) {
@@ -910,6 +953,73 @@ public class OmniCoreScreen extends Screen {
 
     // ========== SourceEntry ==========
 
+    private void openTranslationScreen(int idx, SourceEntry entry) {
+        TranslationConfig tc = entry.transConfig != null ? entry.transConfig : new TranslationConfig();
+        List<String> refNames = new ArrayList<>();
+        List<String> imgNames = new ArrayList<>();
+        for (int j = 0; j < sources.size(); j++) {
+            SourceEntry se = sources.get(j);
+            if (j != idx && !se.isRadar && se.name != null && !se.name.isEmpty()) {
+                refNames.add(se.name);
+            }
+            if (se.isImage && se.name != null && !se.name.isEmpty()
+                    && se.imageData != null && se.imageData.length > 0) {
+                imgNames.add(se.name);
+            }
+        }
+        Minecraft.getInstance().setScreen(new TranslationScreen(tc, config -> {
+            entry.transConfig = config;
+            entry.trans = config.getMode() != TranslationConfig.Mode.NONE;
+            PacketDistributor.sendToServer(new UpdateTranslationPayload(corePos, idx, config.serialize()));
+        }, refNames, imgNames));
+    }
+
+    // ===== Regex configuration popup =====
+    private static class RegexConfigScreen extends Screen {
+        private final String initPat, initRep;
+        private final java.util.function.BiConsumer<String, String> onSave;
+        private EditBox patBox, repBox;
+
+        RegexConfigScreen(String pattern, String replacement,
+                          java.util.function.BiConsumer<String, String> onSave) {
+            super(Component.translatable("gui.create_headsupdisplay.regex_config"));
+            this.initPat = pattern != null ? pattern : "";
+            this.initRep = replacement != null ? replacement : "";
+            this.onSave = onSave;
+        }
+
+        @Override
+        protected void init() {
+            int cx = width / 2 - 100;
+            patBox = new EditBox(font, cx, 30, 200, 20, Component.literal("pattern"));
+            patBox.setMaxLength(128); patBox.setValue(initPat); addRenderableWidget(patBox);
+            repBox = new EditBox(font, cx, 58, 200, 20, Component.literal("replacement"));
+            repBox.setMaxLength(128); repBox.setValue(initRep); addRenderableWidget(repBox);
+
+            addRenderableWidget(Button.builder(Component.translatable("gui.create_headsupdisplay.display_terminal.save"), b -> {
+                onSave.accept(patBox.getValue(), repBox.getValue());
+                onClose();
+            }).bounds(cx, 90, 90, 20).build());
+            addRenderableWidget(Button.builder(Component.translatable("gui.cancel"), b -> onClose())
+                .bounds(cx + 110, 90, 90, 20).build());
+        }
+
+        @Override
+        public void render(GuiGraphics g, int mx, int my, float pt) {
+            renderBackground(g, mx, my, pt);
+            super.render(g, mx, my, pt);
+            int cx = width / 2 - 100;
+            g.drawCenteredString(font, Component.translatable("gui.create_headsupdisplay.regex_config_title").getString(),
+                    width / 2, 4, 0xFFCCFFCC);
+            g.drawString(font, Component.translatable("gui.create_headsupdisplay.regex_pattern").getString(), cx, 20, 0xFFFFFF);
+            g.drawString(font, Component.translatable("gui.create_headsupdisplay.regex_replacement").getString(), cx, 48, 0xFFFFFF);
+            g.drawString(font, Component.translatable("gui.create_headsupdisplay.regex_hint").getString(), cx, 82, 0xAAAAAA);
+        }
+
+        @Override public void onClose() { super.onClose(); }
+        @Override public boolean isPauseScreen() { return false; }
+    }
+
     private static class SourceEntry {
         String name;
         ItemStack freqItem1;
@@ -919,6 +1029,7 @@ public class OmniCoreScreen extends Screen {
         String dlText;
         BlockPos dlSourcePos;
         boolean trans;
+        boolean hasRegex;
         TranslationConfig transConfig;
         boolean isImage;
         UUID imageId;

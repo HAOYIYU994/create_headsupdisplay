@@ -3,13 +3,13 @@
 	"loader": "neoforge:composite",
 	"parent": "block/block",
 	"textures": {
-		"particle": "create_headsupdisplay:block/link_base_unpowered"
+		"particle": "create_headsupdisplay:block/link_base_powered"
 	},
 	"children": {
 		"base": {
 			"render_type": "minecraft:cutout_mipped",
 			"textures": {
-				"0": "create_headsupdisplay:block/link_base_unpowered",
+				"0": "create_headsupdisplay:block/link_base_powered",
 				"1": "create_headsupdisplay:block/link_details"
 			},
 			"elements": [

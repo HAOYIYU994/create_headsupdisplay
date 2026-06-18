@@ -87,6 +87,7 @@ public class CreateHeadsUpDisplay {
 
     private void commonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
+            com.github.haoyiyu.create_headsupdisplay.api.ExternalModeLoader.loadAndRegister();
             com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.lock();
             DisplayTarget.BY_BLOCK.register(ModBlocks.DISPLAY_TERMINAL.get(), new DisplayTerminalTarget());
             DisplayTarget.BY_BLOCK.register(ModBlocks.DISPLAY_TERMINAL_PRO.get(), new DisplayTerminalProTarget());

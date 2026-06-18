@@ -1,6 +1,9 @@
 package com.github.haoyiyu.create_headsupdisplay.screen;
 
+import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
 import com.github.haoyiyu.create_headsupdisplay.client.DynamicTextureCache;
+import com.github.haoyiyu.create_headsupdisplay.config.AnimationIO;
+import com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation;
 import com.github.haoyiyu.create_headsupdisplay.network.*;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.Minecraft;
@@ -112,6 +115,7 @@ public class TerminalProConfigScreen extends Screen {
         float scale = 1f, rotation = 0f;
         int color = 0xFFFFFF, alpha = 255;
         int layerIndex;
+        final List<com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation> animations = new ArrayList<>();
         StaticTextEntry(String t, int x, int y) { text = t; posX = x; posY = y; }
     }
 
@@ -122,6 +126,7 @@ public class TerminalProConfigScreen extends Screen {
         int posX, posY;
         float scale = 1f, rotation = 0f;
         int alpha = 255, layerIndex, instanceId;
+        final List<com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation> animations = new ArrayList<>();
         ImageEntry(UUID id, String fn, byte[] d, int x, int y) { imageId = id; fileName = fn; imageData = d; posX = x; posY = y; }
     }
 
@@ -129,6 +134,7 @@ public class TerminalProConfigScreen extends Screen {
         int posX, posY;
         float scale = 1f, rotation = 0f;
         int alpha = 255, radarRange = 50, layerIndex, instanceId;
+        final List<com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation> animations = new ArrayList<>();
     }
 
     /** 信息源坞中的卡片 */
@@ -198,11 +204,7 @@ public class TerminalProConfigScreen extends Screen {
                 }
                 if (se.sourcePositions.isEmpty()) se.sourcePositions.add(se.sourcePos);
                 if (st.contains("SourceName")) se.sourceName = st.getString("SourceName");
-                if (st.contains("Animations")) {
-                    var at = st.getList("Animations", net.minecraft.nbt.CompoundTag.TAG_COMPOUND);
-                    for (int ai = 0; ai < at.size(); ai++)
-                        se.animations.add(com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation.deserialize(at.getCompound(ai)));
-                }
+                AnimationIO.read(st, se.animations);
                 allSlots.add(se);
             }
         }
@@ -216,6 +218,7 @@ public class TerminalProConfigScreen extends Screen {
                 e.scale = t.getFloat("scale"); e.rotation = t.getFloat("rotation");
                 e.color = t.getInt("color"); e.alpha = t.getInt("alpha");
                 e.layerIndex = t.getInt("layerIndex");
+                AnimationIO.read(t, e.animations);
                 staticTexts.add(e);
                 savedStaticTexts.add(e); // 从 NBT 加载的是已保存的
             }
@@ -230,6 +233,7 @@ public class TerminalProConfigScreen extends Screen {
                         t.getByteArray("ImageData"), t.getInt("PosX"), t.getInt("PosY"));
                 e.scale = t.getFloat("Scale"); e.rotation = t.getFloat("Rotation");
                 e.alpha = t.getInt("Alpha"); e.layerIndex = t.getInt("layerIndex");
+                AnimationIO.read(t, e.animations);
                 images.add(e);
                 savedImages.add(e.imageId);
             }
@@ -245,6 +249,7 @@ public class TerminalProConfigScreen extends Screen {
                 e.scale = t.getFloat("Scale"); e.rotation = t.getFloat("Rotation");
                 e.alpha = t.getInt("Alpha"); e.radarRange = t.getInt("RadarRange");
                 e.layerIndex = t.getInt("layerIndex");
+                AnimationIO.read(t, e.animations);
                 radars.add(e);
                 sourceCards.add(new SourceCard(t("gui.create_headsupdisplay.pro.radar_placeholder"), "Range:" + e.radarRange, BlockPos.ZERO));
             }
@@ -440,11 +445,31 @@ public class TerminalProConfigScreen extends Screen {
 
     private int btnW(String label) { return font.width(label) + 8; }
 
+    private List<SlotAnimation> getElementAnimations(Object el) {
+        if (el instanceof SlotEntry se) return se.animations;
+        if (el instanceof StaticTextEntry st) return st.animations;
+        if (el instanceof ImageEntry ie) return ie.animations;
+        if (el instanceof RadarEntry re) return re.animations;
+        return null;
+    }
+    private int getElementPosX(Object el) {
+        if (el instanceof SlotEntry se) return se.posX; if (el instanceof StaticTextEntry s) return s.posX;
+        if (el instanceof ImageEntry i) return i.posX; if (el instanceof RadarEntry r) return r.posX; return 0;
+    }
+    private int getElementPosY(Object el) {
+        if (el instanceof SlotEntry se) return se.posY; if (el instanceof StaticTextEntry s) return s.posY;
+        if (el instanceof ImageEntry i) return i.posY; if (el instanceof RadarEntry r) return r.posY; return 0;
+    }
+
     private void commitDraft() {
-        if (draftEntry == null) return;
-        draftEntry.posX = width / 2 - 50; draftEntry.posY = height / 2 - 50;
-        allSlots.add(draftEntry); selectedElement = draftEntry; selectedType = 1;
-        playClick(); draftEntry = null; stylePanel.hide();
+        if (draftEntry != null) {
+            // New gauge: place on canvas and select
+            draftEntry.posX = width / 2 - 50; draftEntry.posY = height / 2 - 50;
+            allSlots.add(draftEntry); selectedElement = draftEntry; selectedType = 1;
+            draftEntry = null;
+        }
+        // Edit of existing gauge: changes already applied via ModeTarget interface, just close
+        playClick(); stylePanel.hide();
     }
 
     private int lighten(int c) {
@@ -895,23 +920,29 @@ public class TerminalProConfigScreen extends Screen {
         }
         x += aw + 2;
 
-        // Mode btn — always opens creation panel
+        // Mode btn — modify selected gauge, or create new draft if nothing selected
         String ml = t("gui.create_headsupdisplay.pro.tool_mode");
         int mw = btnW(ml);
         if (mx >= x && mx <= x + mw && my >= 0 && my <= menuH) {
             playClick();
-            if (draftEntry == null) {
+            SlotEntry target = (selectedElement instanceof SlotEntry se) ? se : null;
+            if (target != null) {
+                // Edit the existing gauge in-place
+                draftEntry = null;
+            } else {
+                // Nothing selected: create a fresh draft
                 var m = com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.get(0);
-                draftEntry = new SlotEntry(BlockPos.ZERO, currentLayer);
-                draftEntry.sourcePositions.clear(); draftEntry.dataValues.clear(); draftEntry.sourceNames.clear();
-                if (m != null) { draftEntry.setDisplayModeId(m.getId());
-                    for (var p : m.getConfigParameters()) { var cfg=draftEntry.modeConfig;
+                target = new SlotEntry(BlockPos.ZERO, currentLayer);
+                target.sourcePositions.clear(); target.dataValues.clear(); target.sourceNames.clear();
+                if (m != null) { target.setDisplayModeId(m.getId());
+                    for (var p : m.getConfigParameters()) { var cfg=target.modeConfig;
                         switch(p.type()){case FLOAT->cfg.setFloat(p.key(),((Number)p.defaultValue()).floatValue());case INT->cfg.setInt(p.key(),((Number)p.defaultValue()).intValue());case STRING->cfg.setString(p.key(),(String)p.defaultValue());case BOOLEAN->cfg.setBoolean(p.key(),(Boolean)p.defaultValue());case COLOR->cfg.setInt(p.key(),((Number)p.defaultValue()).intValue());} } }
+                draftEntry = target;
             }
             int dh = (int) Mth.lerp(dockAnim, DOCK_COLLAPSED, DOCK_HEIGHT);
             int panelY = height - dh - 330; // panel above dock, never overlap
             if (panelY < 30) panelY = 30;
-            stylePanel.show(width / 2 - 110, panelY, draftEntry);
+            stylePanel.show(width / 2 - 110, panelY, target);
             return true;
         }
         x += mw + 2;
@@ -927,12 +958,22 @@ public class TerminalProConfigScreen extends Screen {
         }
         x += cw + 2;
 
-        // Anim btn
+        // Anim btn — all slot types that carry animations
         int animW = btnW(t("gui.create_headsupdisplay.pro.tool_anim"));
-        if (mx >= x && mx <= x + animW && my >= 0 && my <= menuH && selectedElement instanceof SlotEntry se) {
+        if (mx >= x && mx <= x + animW && my >= 0 && my <= menuH && selectedElement != null) {
             playClick();
-            animPanel.show(width / 2 - 150, 40, se.animations);
-            return true;
+            var srcNames = new java.util.ArrayList<String>();
+            for (var s : allSlots) {
+                if (s.sourceName != null && !s.sourceName.isEmpty() && !srcNames.contains(s.sourceName))
+                    srcNames.add(s.sourceName);
+                for (var sn : s.sourceNames) if (!sn.isEmpty() && !srcNames.contains(sn)) srcNames.add(sn);
+            }
+            for (var sc : sourceCards) if (sc.name != null && !sc.name.isEmpty() && !srcNames.contains(sc.name)) srcNames.add(sc.name);
+            List<SlotAnimation> anims = getElementAnimations(selectedElement);
+            if (anims != null) {
+                animPanel.show(width / 2 - 150, 40, anims, srcNames);
+                return true;
+            }
         }
         x += animW + 2;
 
@@ -1149,10 +1190,12 @@ public class TerminalProConfigScreen extends Screen {
                     se.posY = Math.max(canvasY, (int) my - 10);
                     se.text = dockDragCard.value;
                     se.sourceName = dockDragCard.name;
+                    se.dataValues.clear();
+                    se.dataValues.add(dockDragCard.value != null ? dockDragCard.value : "");
+                    se.sourceNames.clear();
+                    se.sourceNames.add(dockDragCard.name != null ? dockDragCard.name : "");
                     allSlots.add(se);
                     playClick();
-                    PacketDistributor.sendToServer(new UpdateSlotPayload(terminalPos, se.sourcePos, se.instanceId,
-                            se.posX, se.posY, se.scale, se.rotation, se.color, se.alpha));
                 } else if (dockDragCard.type == 1 && dockDragCard.imageId != null) {
                     ImageEntry ie = new ImageEntry(dockDragCard.imageId, dockDragCard.name,
                             dockDragCard.imageData != null ? dockDragCard.imageData : new byte[0],
@@ -1162,8 +1205,6 @@ public class TerminalProConfigScreen extends Screen {
                     images.add(ie);
                     savedImages.add(ie.imageId);
                     playClick();
-                    PacketDistributor.sendToServer(new UpdateImageConfigPayload(terminalPos, ie.imageId,
-                            ie.posX, ie.posY, ie.scale, ie.rotation, ie.alpha));
                 }
             }
             dockDragCard = null;
@@ -1393,54 +1434,40 @@ public class TerminalProConfigScreen extends Screen {
         else if (e instanceof ImageEntry se) se.rotation = r % 360;
         else if (e instanceof RadarEntry se) se.rotation = r % 360;
     }
-    /** 坞 X：删除卡片、画布槽位、服务端数据 */
+    /** 坞 X：删除卡片、画布槽位（仅本地，保存才生效） */
     private void deleteSourceCard(SourceCard card, int idx) {
-        if (card.type == 0 && !BlockPos.ZERO.equals(card.sourcePos)) {
+        if (card.type == 0 && !BlockPos.ZERO.equals(card.sourcePos))
             allSlots.removeIf(s -> s.sourcePos.equals(card.sourcePos));
-            PacketDistributor.sendToServer(new RemoveSlotSourcePayload(terminalPos, card.sourcePos));
-        }
-        if (card.type == 1 && card.imageId != null) {
+        if (card.type == 1 && card.imageId != null)
             images.removeIf(im -> im.imageId.equals(card.imageId));
-            PacketDistributor.sendToServer(new RemoveImagePayload(terminalPos, card.imageId));
-        }
-        if (card.type == 2) {
+        if (card.type == 2)
             radars.clear();
-        }
         sourceCards.remove(idx);
     }
 
-    /** 工具栏🗑：只删画布槽位，保留坞卡片 */
+    /** 工具栏🗑：只删画布槽位（仅本地，保存才生效） */
     private void deleteElement(Object e) {
-        if (e instanceof SlotEntry s) {
-            allSlots.remove(s);
-            if (!BlockPos.ZERO.equals(s.sourcePos))
-                PacketDistributor.sendToServer(new RemoveSlotPayload(terminalPos, s.sourcePos));
-        } else if (e instanceof StaticTextEntry s) {
-            int idx = staticTexts.indexOf(s);
-            staticTexts.remove(s);
-            PacketDistributor.sendToServer(new RemoveStaticTextPayload(terminalPos, idx));
-        } else if (e instanceof ImageEntry s) {
-            images.remove(s);
-            PacketDistributor.sendToServer(new RemoveImagePayload(terminalPos, s.imageId));
-        } else if (e instanceof RadarEntry s) {
-            int idx = radars.indexOf(s);
-            radars.remove(s);
-            PacketDistributor.sendToServer(new RemoveRadarSlotPayload(terminalPos, idx));
-        }
+        if (e instanceof SlotEntry s) allSlots.remove(s);
+        else if (e instanceof StaticTextEntry s) staticTexts.remove(s);
+        else if (e instanceof ImageEntry s) images.remove(s);
+        else if (e instanceof RadarEntry s) radars.remove(s);
     }
 
     private void onLayersChanged() { currentLayer = layerPanel.getCurrentLayer(); }
 
     private void onAnimChanged(String action) {
-        if (!(selectedElement instanceof SlotEntry se)) return;
         if (action.startsWith("capture:")) {
             String[] parts = action.split(":");
             int animIdx = Integer.parseInt(parts[1]), kfIdx = Integer.parseInt(parts[2]);
-            if (animIdx >= 0 && animIdx < se.animations.size() && kfIdx >= 0 && kfIdx < se.animations.get(animIdx).keyframes.size()) {
-                var k = se.animations.get(animIdx).keyframes.get(kfIdx);
-                k.posX = (float) se.posX; k.posY = (float) se.posY;
-                k.scale = se.scale; k.rotation = se.rotation;
-                k.color = se.color; k.alpha = se.alpha;
+            List<SlotAnimation> anims = getElementAnimations(selectedElement);
+            if (anims != null && animIdx >= 0 && animIdx < anims.size() && kfIdx >= 0 && kfIdx < anims.get(animIdx).keyframes.size()) {
+                var k = anims.get(animIdx).keyframes.get(kfIdx);
+                k.posX = (float)getElementPosX(selectedElement);
+                k.posY = (float)getElementPosY(selectedElement);
+                k.scale = getElementScale(selectedElement);
+                k.rotation = getElementRotation(selectedElement);
+                k.color = getElementColor(selectedElement);
+                k.alpha = getElementAlpha(selectedElement);
             }
         }
     }
@@ -1500,6 +1527,7 @@ public class TerminalProConfigScreen extends Screen {
             t.putString("text", e.text); t.putInt("posX", e.posX); t.putInt("posY", e.posY);
             t.putFloat("scale", e.scale); t.putFloat("rotation", e.rotation);
             t.putInt("color", e.color); t.putInt("alpha", e.alpha); t.putInt("layerIndex", e.layerIndex);
+            AnimationIO.write(t, e.animations);
             stTag.add(t);
         }
         full.put("StaticTexts", stTag);
@@ -1513,6 +1541,7 @@ public class TerminalProConfigScreen extends Screen {
             t.putInt("PosX", e.posX); t.putInt("PosY", e.posY);
             t.putFloat("Scale", e.scale); t.putFloat("Rotation", e.rotation);
             t.putInt("Alpha", e.alpha); t.putInt("layerIndex", e.layerIndex);
+            AnimationIO.write(t, e.animations);
             imgTag.add(t);
         }
         full.put("Images", imgTag);
@@ -1525,6 +1554,7 @@ public class TerminalProConfigScreen extends Screen {
             t.putFloat("Scale", e.scale); t.putFloat("Rotation", e.rotation);
             t.putInt("Alpha", e.alpha); t.putInt("RadarRange", e.radarRange);
             t.putInt("layerIndex", e.layerIndex);
+            AnimationIO.write(t, e.animations);
             radTag.add(t);
         }
         full.put("RadarSlots", radTag);
@@ -1555,9 +1585,8 @@ public class TerminalProConfigScreen extends Screen {
             }
             t.put("SourcePositions",pl); t.put("DataValues",dl); t.put("SourceNames",nl);
         }
-        net.minecraft.nbt.ListTag animTag = new net.minecraft.nbt.ListTag();
-        for (var a : s.animations) animTag.add(a.serialize());
-        t.put("Animations", animTag);
+        AnimationIO.write(t, s.animations);
+        CreateHeadsUpDisplay.LOGGER.info("[SAVE] Slot anims count: {}", s.animations.size());
         return t;
     }
 

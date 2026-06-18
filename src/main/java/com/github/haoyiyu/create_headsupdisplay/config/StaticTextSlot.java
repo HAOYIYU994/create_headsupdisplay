@@ -1,5 +1,8 @@
 package com.github.haoyiyu.create_headsupdisplay.config;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class StaticTextSlot {
     private String text;
     private int posX, posY;
@@ -7,7 +10,7 @@ public class StaticTextSlot {
     private float rotation;
     private int color = 0xFFFFFF;
     private int alpha = 255;
-
+    private final List<SlotAnimation> animations = new ArrayList<>();
 
     public StaticTextSlot(String text, int posX, int posY, float scale, float rotation, int color, int alpha) {
         this.text = text;
@@ -27,6 +30,7 @@ public class StaticTextSlot {
     public float getRotation() { return rotation; }
     public int getColor() { return color; }
     public int getAlpha() { return alpha; }
+    public List<SlotAnimation> getAnimations() { return animations; }
 
     public void setText(String text) { this.text = text; }
     public void setPos(int x, int y) { posX = x; posY = y; }

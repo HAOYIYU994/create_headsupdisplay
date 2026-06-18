@@ -83,7 +83,9 @@ public class DisplayMultiBlockHelper {
         BlockPos term = null;
         for (Direction d : net.minecraft.core.Direction.values()) {
             BlockPos n = controllerPos.relative(d);
-            if (level.getBlockEntity(n) instanceof com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlockEntity) {
+            var be = level.getBlockEntity(n);
+            if (be instanceof com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlockEntity
+                || be instanceof com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalProBlockEntity) {
                 term = n; break;
             }
         }

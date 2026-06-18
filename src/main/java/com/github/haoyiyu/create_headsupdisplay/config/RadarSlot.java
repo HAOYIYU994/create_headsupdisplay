@@ -12,6 +12,8 @@ public class RadarSlot {
     private float rotation;
     private int alpha;
     private int radarRange;  // 雷达显示范围（米），默认 50
+    private final java.util.List<SlotAnimation> animations = new java.util.ArrayList<>();
+    public java.util.List<SlotAnimation> getAnimations() { return animations; }
 
     public RadarSlot() {
         this.posX = 200;
@@ -43,6 +45,7 @@ public class RadarSlot {
         tag.putFloat("Rotation", rotation);
         tag.putInt("Alpha", alpha);
         tag.putInt("RadarRange", radarRange);
+        AnimationIO.write(tag, animations);
         return tag;
     }
 
@@ -54,6 +57,7 @@ public class RadarSlot {
         slot.rotation = tag.getFloat("Rotation");
         slot.alpha = tag.getInt("Alpha");
         if (tag.contains("RadarRange")) slot.radarRange = tag.getInt("RadarRange");
+        AnimationIO.read(tag, slot.animations);
         return slot;
     }
 }

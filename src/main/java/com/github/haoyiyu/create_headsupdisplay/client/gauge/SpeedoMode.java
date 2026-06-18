@@ -41,7 +41,7 @@ public class SpeedoMode implements IDisplayMode {
         int cx=w/2,cy=h-10,r=Math.min(w,cy)-4;
         RenderSystem.enableBlend();
         if (FACE!=null) g.blit(FACE,cx-50,cy-55,100,60,0,0,100,60,100,60);
-        g.pose().pushPose(); g.pose().translate(cx,cy,0); g.pose().mulPose(Axis.ZP.rotationDegrees(180f+pct*180f));
+        g.pose().pushPose(); g.pose().translate(cx,cy,0); g.pose().mulPose(Axis.ZP.rotationDegrees(270f+pct*180f));
         if (NEEDLE!=null) g.blit(NEEDLE,-2,-48,4,48,0,0,4,50,4,50);
         g.pose().popPose();
         g.fill(cx-3,cy-3,cx+4,cy+4,0x88CCCCDD);

@@ -119,9 +119,7 @@ public class DisplaySlot {
             }
             tag.put("SourcePositions",pl); tag.put("DataValues",dl); tag.put("SourceNames",nl);
         }
-        ListTag animTag = new ListTag();
-        for (SlotAnimation a : animations) animTag.add(a.serialize());
-        tag.put("Animations", animTag);
+        AnimationIO.write(tag, animations);
         return tag;
     }
 
@@ -156,11 +154,7 @@ public class DisplaySlot {
                 slot.sourceNames.add(i<nl.size()?nl.getCompound(i).getString("Name"):"");
             }
         }
-        if (tag.contains("Animations")) {
-            ListTag animTag = tag.getList("Animations", CompoundTag.TAG_COMPOUND);
-            for (int i = 0; i < animTag.size(); i++)
-                slot.animations.add(SlotAnimation.deserialize(animTag.getCompound(i)));
-        }
+        AnimationIO.read(tag, slot.animations);
         return slot;
     }
 }

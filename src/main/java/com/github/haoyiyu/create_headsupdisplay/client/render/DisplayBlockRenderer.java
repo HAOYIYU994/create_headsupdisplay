@@ -4,17 +4,21 @@ import com.github.haoyiyu.create_headsupdisplay.block.DisplayBlock;
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayBlockEntity;
 import com.github.haoyiyu.create_headsupdisplay.client.ClientHudData;
 import com.github.haoyiyu.create_headsupdisplay.client.DynamicTextureCache;
+import com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry;
+import com.github.haoyiyu.create_headsupdisplay.api.IDisplayMode;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferUploader;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.Tesselator;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import com.mojang.math.Axis;
 import com.simibubi.create.foundation.blockEntity.renderer.SmartBlockEntityRenderer;
 import dev.engine_room.flywheel.lib.transform.TransformStack;
 import net.createmod.catnip.math.AngleHelper;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.blockentity.BlockEntityRendererProvider;
@@ -125,19 +129,31 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
             }
         }
 
+        // --- 渲染纹理仪表（深度开启 — g.blit() 写深度，不穿墙也不闪） ---
+        if (slots != null) {
+            for (var slot : slots) {
+                if (!isTexturedMode(slot)) continue;
+                float dx = slot.posX * scaleX;
+                float dy = slot.posY * scaleY;
+                if (!inRegion(dx, dy, regionLeft, regionRight, regionTop, regionBottom)) continue;
+                renderSlotOnPanel(pose, buffer, font, slot, dx, dy, scaleX, scaleY, light);
+                renderedCount++;
+            }
+        }
+
         // 关闭深度测试，开始字体渲染
         RenderSystem.disableDepthTest();
         RenderSystem.depthMask(false);
         font.drawInBatch(" ", 0, 0, 0x00000000, false, pose.last().pose(), buffer, Font.DisplayMode.NORMAL, 0, light);
 
-        // --- 渲染动态槽位（顶层） ---
+        // --- 渲染填充类仪表 + 纯文本（深度关闭，g.fill/drawString 不闪） ---
         if (slots != null) {
             for (var slot : slots) {
+                if (isTexturedMode(slot)) continue;
                 float dx = slot.posX * scaleX;
                 float dy = slot.posY * scaleY;
                 if (!inRegion(dx, dy, regionLeft, regionRight, regionTop, regionBottom)) continue;
-
-                renderText(pose, buffer, font, slot.text, dx, dy, slot.scale, slot.color, slot.alpha, light);
+                renderSlotOnPanel(pose, buffer, font, slot, dx, dy, scaleX, scaleY, light);
                 renderedCount++;
             }
         }
@@ -367,6 +383,74 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
 
     private boolean inRegion(float x, float y, float left, float right, float top, float bottom) {
         return x >= left && x < right && y >= top && y < bottom;
+    }
+
+    /** True when the mode renders with g.blit() textures — these write correct depth. */
+    private static boolean isTexturedMode(ClientHudData.SlotRenderData slot) {
+        if (slot.displayModeId != null) {
+            String p = slot.displayModeId.getPath();
+            return p.equals("bar") || p.equals("altimeter") || p.equals("dial")
+                || p.equals("digital") || p.equals("speedometer") || p.equals("compass");
+        }
+        // Legacy modes: 1=bar 2=altimeter 3=dial 4=digital
+        return slot.displayMode >= 1 && slot.displayMode <= 4;
+    }
+
+    /** Renders a data-source slot via the IDisplayMode system — future-proof for all modes. */
+    private void renderSlotOnPanel(PoseStack basePose, MultiBufferSource buffer, Font font,
+                                   ClientHudData.SlotRenderData slot,
+                                   float dx, float dy, float scaleX, float scaleY, int light) {
+        IDisplayMode mode = slot.displayModeId != null
+            ? DisplayModeRegistry.get(slot.displayModeId)
+            : DisplayModeRegistry.get(slot.displayMode);
+        if (mode == null) {
+            // Fallback: plain text
+            renderText(basePose, buffer, font, slot.text, dx, dy, slot.scale, slot.color, slot.alpha, light);
+            return;
+        }
+
+        if (!(buffer instanceof MultiBufferSource.BufferSource bs)) {
+            renderText(basePose, buffer, font, slot.text, dx, dy, slot.scale, slot.color, slot.alpha, light);
+            return;
+        }
+
+        // Bridge the IDisplayMode system (GuiGraphics) to the block-entity renderer.
+        // Copy the base pose (world→panel) into a fresh GuiGraphics, then scale so that
+        // 1 GuiGraphics unit = 1 editor pixel.  Modes render at their default editor-pixel
+        // size, and all future modes added via DisplayModeRegistry work here automatically.
+        // Evaluate animations
+        var animRes = new com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.Result();
+        if (!slot.animations.isEmpty()) {
+            com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.evaluate(
+                slot.animations, slot.text, animRes,
+                new com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.SlotRef() {
+                    public float getPosX() { return (float)slot.posX; } public void setPosX(float v) {}
+                    public float getPosY() { return (float)slot.posY; } public void setPosY(float v) {}
+                    public float getScale() { return slot.scale; } public void setScale(float v) {}
+                    public float getRotation() { return slot.rotation; } public void setRotation(float v) {}
+                    public int getColor() { return slot.color; } public void setColor(int v) {}
+                    public int getAlpha() { return slot.alpha; } public void setAlpha(int v) {}
+                });
+        }
+        float aX = animRes.posX != null ? animRes.posX : slot.posX;
+        float aY = animRes.posY != null ? animRes.posY : slot.posY;
+        float aS = animRes.scale != null ? animRes.scale : slot.scale;
+        float aR = animRes.rotation != null ? animRes.rotation : slot.rotation;
+
+        GuiGraphics g = new GuiGraphics(Minecraft.getInstance(), bs);
+        g.pose().last().pose().set(basePose.last().pose());
+        g.pose().scale(scaleX, scaleY, 1f);
+
+        g.pose().pushPose();
+        g.pose().translate(aX, aY, 0);
+        g.pose().scale(aS, aS, 1f);
+        g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(aR));
+
+        mode.render(g, font, slot.dataValues, slot.modeConfig,
+                    mode.getDefaultWidth(), mode.getDefaultHeight());
+
+        g.pose().popPose();
+        g.flush();
     }
 
     private void renderText(PoseStack pose, MultiBufferSource buffer, Font font,

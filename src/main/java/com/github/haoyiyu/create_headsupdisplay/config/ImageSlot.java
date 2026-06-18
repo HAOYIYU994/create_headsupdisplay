@@ -16,6 +16,8 @@ public class ImageSlot {
     private float scale;
     private float rotation;
     private int alpha;
+    private final java.util.List<SlotAnimation> animations = new java.util.ArrayList<>();
+    public java.util.List<SlotAnimation> getAnimations() { return animations; }
 
     public ImageSlot(UUID imageId, String fileName, byte[] imageData) {
         this.imageId = imageId;
@@ -57,6 +59,7 @@ public class ImageSlot {
         tag.putFloat("Scale", scale);
         tag.putFloat("Rotation", rotation);
         tag.putInt("Alpha", alpha);
+        AnimationIO.write(tag, animations);
         return tag;
     }
 
@@ -71,6 +74,7 @@ public class ImageSlot {
         slot.scale = tag.getFloat("Scale");
         slot.rotation = tag.getFloat("Rotation");
         slot.alpha = tag.getInt("Alpha");
+        AnimationIO.read(tag, slot.animations);
         return slot;
     }
 }

@@ -15,7 +15,14 @@ public class TranslationConfig {
 
     private Mode mode = Mode.NONE;
     private String expression = "";  // 表达式型：如 "3*x+6"
+    private String regexPattern = "";   // 正则型：匹配模式
+    private String regexReplacement = ""; // 正则型：替换字符串
     private List<ConditionalRule> rules = new ArrayList<>(); // 条件型规则列表
+
+    public String getRegexPattern() { return regexPattern; }
+    public void setRegexPattern(String p) { this.regexPattern = p; }
+    public String getRegexReplacement() { return regexReplacement; }
+    public void setRegexReplacement(String r) { this.regexReplacement = r; }
 
     // ===== 条件型规则 =====
     public static class ConditionalRule {
@@ -37,6 +44,18 @@ public class TranslationConfig {
     public String getExpression() { return expression; }
     public void setExpression(String expr) { this.expression = expr; }
     public List<ConditionalRule> getRules() { return rules; }
+
+    /** 正则提取数值 —— 在转译之前对原始文本做前处理。提取失败返回 NaN。 */
+    public float extractNumber(String rawText) {
+        if (regexPattern.isEmpty() || rawText == null || rawText.isEmpty()) return Float.NaN;
+        try {
+            String extracted = Pattern.compile(regexPattern).matcher(rawText).replaceAll(regexReplacement);
+            if (extracted.isEmpty()) return Float.NaN;
+            // 去掉空格和单位后缀，只取第一段数字
+            String num = extracted.trim().split(" ")[0];
+            return Float.parseFloat(num);
+        } catch (Exception e) { return Float.NaN; }
+    }
 
     /** 返回转译后的显示文本。null 表示无转译。 */
     public String getDisplay(int input) {
@@ -189,6 +208,8 @@ public class TranslationConfig {
         CompoundTag tag = new CompoundTag();
         tag.putInt("mode", mode.ordinal());
         tag.putString("expr", expression);
+        tag.putString("rxPat", regexPattern);
+        tag.putString("rxRep", regexReplacement);
         List<CompoundTag> rulesTag = new ArrayList<>();
         for (ConditionalRule r : rules) {
             CompoundTag rt = new CompoundTag();
@@ -207,6 +228,8 @@ public class TranslationConfig {
         TranslationConfig tc = new TranslationConfig();
         tc.mode = Mode.values()[tag.getInt("mode")];
         tc.expression = tag.getString("expr");
+        tc.regexPattern = tag.getString("rxPat");
+        tc.regexReplacement = tag.getString("rxRep");
         int count = tag.getInt("ruleCount");
         for (int i = 0; i < count; i++) {
             CompoundTag rt = tag.getCompound("rule_" + i);

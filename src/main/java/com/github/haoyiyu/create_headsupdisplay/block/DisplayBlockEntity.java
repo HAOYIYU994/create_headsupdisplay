@@ -60,7 +60,8 @@ public class DisplayBlockEntity extends SmartBlockEntity {
         if (boundTerminal != null) return;
         for (Direction d : Direction.values()) {
             BlockPos n = worldPosition.relative(d);
-            if (level.getBlockEntity(n) instanceof DisplayTerminalBlockEntity term) {
+            var be = level.getBlockEntity(n);
+            if (be instanceof DisplayTerminalBlockEntity || be instanceof DisplayTerminalProBlockEntity) {
                 boundTerminal = n;
                 if (isController()) setChanged();
                 if (getBlockState().getValue(DisplayBlock.SHAPE) == DisplayBlock.Shape.SINGLE)

@@ -66,6 +66,14 @@ public class DisplayTerminalBlock extends BaseEntityBlock {
         }
     }
 
+    @Override
+    protected void onRemove(BlockState state, Level level, BlockPos pos, BlockState newState, boolean moved) {
+        if (!level.isClientSide && !newState.is(state.getBlock())) {
+            tryAutoUnbindFromOmniCore(level, pos);
+        }
+        super.onRemove(state, level, pos, newState, moved);
+    }
+
     /** 放置终端时自动检测相邻位置是否有 OmniCore，有则直接绑定 */
     private void tryAutoBindToOmniCore(Level level, BlockPos terminalPos) {
         for (Direction dir : Direction.values()) {
@@ -74,6 +82,19 @@ public class DisplayTerminalBlock extends BaseEntityBlock {
                 BlockEntity be = level.getBlockEntity(neighbor);
                 if (be instanceof OmniCoreBlockEntity core) {
                     core.setBoundTerminal(terminalPos);
+                }
+            }
+        }
+    }
+
+    /** 拆除终端时自动通知相邻 OmniCore 解绑 */
+    private void tryAutoUnbindFromOmniCore(Level level, BlockPos terminalPos) {
+        for (Direction dir : Direction.values()) {
+            BlockPos neighbor = terminalPos.relative(dir);
+            if (level.getBlockState(neighbor).is(ModBlocks.OMNI_CORE.get())) {
+                BlockEntity be = level.getBlockEntity(neighbor);
+                if (be instanceof OmniCoreBlockEntity core) {
+                    core.removeBoundTerminal(terminalPos);
                 }
             }
         }

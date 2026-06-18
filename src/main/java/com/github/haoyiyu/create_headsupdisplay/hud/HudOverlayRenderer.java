@@ -127,31 +127,43 @@ public class HudOverlayRenderer {
             RenderSystem.enableBlend();
             for (int idx = 0; idx < images.size(); idx++) {
                 var img = images.get(idx);
+                var aRes = new com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.Result();
+                if (!img.animations.isEmpty()) {
+                    com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.evaluate(
+                        img.animations, img.fileName, aRes, new AnimSlotRef(img));
+                }
+                int aix = aRes.posX != null ? aRes.posX.intValue() : img.posX;
+                int aiy = aRes.posY != null ? aRes.posY.intValue() : img.posY;
+                float asc = aRes.scale != null ? aRes.scale : img.scale;
+                float arot = aRes.rotation != null ? aRes.rotation : img.rotation;
+                int aalpha = aRes.alpha != null ? aRes.alpha : img.alpha;
+
                 int ix, iy;
                 if (img.frozen) {
                     String key = "img:" + img.imageId;
-                    float[] wp = getOrCreateWorldAnchor(key, img.posX, img.posY,
+                    float[] wp = getOrCreateWorldAnchor(key, aix, aiy,
                             terminalYaw, terminalPitch, screenW, screenH, focalPx, FROZEN_DEFAULT_DEPTH);
                     ix = (int) projectWorldToScreenX(wp[0], playerYaw, screenW, focalPx,
                             latMove, wp[2], focalPx);
                     float wy = projectWorldToScreenYFull(wp[1], playerPitch, screenH, focalPx, upMove, wp[2], focalPx);
-                    iy = (int)(img.posY + (wy - img.posY) * Y_BLEND);
+                    iy = (int)(aiy + (wy - aiy) * Y_BLEND);
                     g.pose().pushPose();
                     g.pose().translate(ix, iy, 0);
-                    g.pose().scale(img.scale, img.scale, 1f);
-                    g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(img.rotation));
+                    g.pose().scale(asc, asc, 1f);
+                    g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(arot));
                 } else {
                     g.pose().pushPose();
-                    g.pose().translate(img.posX, img.posY, 0);
-                    g.pose().scale(img.scale, img.scale, 1f);
-                    g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(img.rotation));
+                    g.pose().translate(aix, aiy, 0);
+                    g.pose().scale(asc, asc, 1f);
+                    g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(arot));
                 }
+                RenderSystem.setShaderColor(1f, 1f, 1f, aalpha / 255f);
                 ResourceLocation tex = DynamicTextureCache.getOrCreate(img.imageId, img.imageData);
                 if (tex != null) {
                     int iw = DynamicTextureCache.getWidth(img.imageId);
                     int ih = DynamicTextureCache.getHeight(img.imageId);
                     if (iw > 0 && ih > 0) {
-                        RenderSystem.setShaderColor(1f, 1f, 1f, img.alpha / 255f);
+                        RenderSystem.setShaderColor(1f, 1f, 1f, aalpha / 255f);
                         g.blit(tex, 0, 0, 0, 0, iw, ih, iw, ih);
                     }
                 }
@@ -169,19 +181,32 @@ public class HudOverlayRenderer {
         if (radars != null && mc.player != null) {
             for (int idx = 0; idx < radars.size(); idx++) {
                 var slot = radars.get(idx);
+                var aRes = new com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.Result();
+                if (!slot.animations.isEmpty()) {
+                    com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.evaluate(
+                        slot.animations, "", aRes, new AnimSlotRef(slot));
+                }
+                int arx = aRes.posX != null ? aRes.posX.intValue() : slot.posX;
+                int ary = aRes.posY != null ? aRes.posY.intValue() : slot.posY;
+                float asc = aRes.scale != null ? aRes.scale : slot.scale;
+                float arot = aRes.rotation != null ? aRes.rotation : slot.rotation;
+                int aalpha = aRes.alpha != null ? aRes.alpha : slot.alpha;
+                // Apply animated values to a temporary slot copy
+                var animSlot = new ClientHudData.RadarRenderData(arx, ary, asc, arot, aalpha, slot.radarRange, slot.layerIndex, slot.frozen, slot.animations);
+
                 int rx, ry;
                 if (slot.frozen) {
                     String key = "radar:" + idx;
-                    float[] wp = getOrCreateWorldAnchor(key, slot.posX, slot.posY,
+                    float[] wp = getOrCreateWorldAnchor(key, arx, ary,
                             terminalYaw, terminalPitch, screenW, screenH, focalPx, FROZEN_DEFAULT_DEPTH);
                     rx = (int) projectWorldToScreenX(wp[0], playerYaw, screenW, focalPx,
                             latMove, wp[2], focalPx);
                     float wyr = projectWorldToScreenYFull(wp[1], playerPitch, screenH, focalPx, upMove, wp[2], focalPx);
-                    ry = (int)(slot.posY + (wyr - slot.posY) * Y_BLEND);
+                    ry = (int)(ary + (wyr - ary) * Y_BLEND);
                 } else {
-                    rx = slot.posX; ry = slot.posY;
+                    rx = arx; ry = ary;
                 }
-                renderRadarSlot(g, mc, slot, tracks, rx, ry);
+                renderRadarSlot(g, mc, animSlot, tracks, rx, ry);
             }
         }
 
@@ -190,10 +215,23 @@ public class HudOverlayRenderer {
         // ================================================================
         var slots = ClientHudData.getSlotsFor(boundTerminal);
         if (slots != null) {
+            // 按名称索引所有源的值，供动画触发源查找
+            var nameToValue = new java.util.HashMap<String, String>();
+            for (var s : slots) {
+                for (int si = 0; si < s.sourceNames.size() && si < s.dataValues.size(); si++)
+                    nameToValue.put(s.sourceNames.get(si), s.dataValues.get(si));
+            }
+
             for (var slot : slots) {
+                // 解析动画触发源：triggerSourceName 非空时取对应源的值，否则取自身
+                String triggerData = slot.text;
+                for (var anim : slot.animations) {
+                    if (!anim.triggerSourceName.isEmpty())
+                        triggerData = nameToValue.getOrDefault(anim.triggerSourceName, slot.text);
+                }
                 // 动画求值
                 var animRes = new com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.Result();
-                com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.evaluate(slot.animations, slot.text, animRes,
+                com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.evaluate(slot.animations, triggerData, animRes,
                     new com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.SlotRef() {
                         public float getPosX() { return (float)slot.posX; } public void setPosX(float v) {}
                         public float getPosY() { return (float)slot.posY; } public void setPosY(float v) {}
@@ -247,23 +285,36 @@ public class HudOverlayRenderer {
         if (sts != null) {
             for (int idx = 0; idx < sts.size(); idx++) {
                 var slot = sts.get(idx);
+                // Evaluate animations
+                var aRes = new com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.Result();
+                if (!slot.animations.isEmpty()) {
+                    com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.evaluate(
+                        slot.animations, slot.text, aRes, new AnimSlotRef(slot));
+                }
+                int atx = aRes.posX != null ? aRes.posX.intValue() : slot.posX;
+                int aty = aRes.posY != null ? aRes.posY.intValue() : slot.posY;
+                float asc = aRes.scale != null ? aRes.scale : slot.scale;
+                float arot = aRes.rotation != null ? aRes.rotation : slot.rotation;
+                int acolor = aRes.color != null ? aRes.color : slot.color;
+                int aalpha = aRes.alpha != null ? aRes.alpha : slot.alpha;
+
                 int tx, ty;
                 if (slot.frozen) {
                     String key = "text:" + slot.text.hashCode() + ":" + slot.layerIndex;
-                    float[] wp = getOrCreateWorldAnchor(key, slot.posX, slot.posY,
+                    float[] wp = getOrCreateWorldAnchor(key, atx, aty,
                             terminalYaw, terminalPitch, screenW, screenH, focalPx, FROZEN_DEFAULT_DEPTH);
                     tx = (int) projectWorldToScreenX(wp[0], playerYaw, screenW, focalPx,
                             latMove, wp[2], focalPx);
                     float wyt = projectWorldToScreenYFull(wp[1], playerPitch, screenH, focalPx, upMove, wp[2], focalPx);
-                    ty = (int)(slot.posY + (wyt - slot.posY) * Y_BLEND);
+                    ty = (int)(aty + (wyt - aty) * Y_BLEND);
                 } else {
-                    tx = slot.posX; ty = slot.posY;
+                    tx = atx; ty = aty;
                 }
                 g.pose().pushPose();
                 g.pose().translate(tx, ty, 0);
-                g.pose().scale(slot.scale, slot.scale, 1f);
-                g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(slot.rotation));
-                int argb = (slot.alpha << 24) | (slot.color & 0x00FFFFFF);
+                g.pose().scale(asc, asc, 1f);
+                g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(arot));
+                int argb = (aalpha << 24) | (acolor & 0x00FFFFFF);
                 g.drawString(font, slot.text.replaceAll("§[0-9a-fk-or]", ""), 0, 0, argb, false);
                 g.pose().popPose();
             }
@@ -468,6 +519,20 @@ public class HudOverlayRenderer {
                 return p.getName().getString();
         }
         return id.length() > 12 ? id.substring(0, 12) : id;
+    }
+
+    /** Bridge any render-data object to AnimationEvaluator.SlotRef */
+    private static class AnimSlotRef implements com.github.haoyiyu.create_headsupdisplay.client.AnimationEvaluator.SlotRef {
+        private final Object data;
+        AnimSlotRef(Object data) { this.data = data; }
+        public float getPosX() { return (float)(data instanceof ClientHudData.SlotRenderData s ? s.posX : data instanceof ClientHudData.StaticTextRenderData t ? t.posX : data instanceof ClientHudData.ImageRenderData i ? i.posX : data instanceof ClientHudData.RadarRenderData r ? r.posX : 0); }
+        public float getPosY() { return (float)(data instanceof ClientHudData.SlotRenderData s ? s.posY : data instanceof ClientHudData.StaticTextRenderData t ? t.posY : data instanceof ClientHudData.ImageRenderData i ? i.posY : data instanceof ClientHudData.RadarRenderData r ? r.posY : 0); }
+        public float getScale() { return data instanceof ClientHudData.SlotRenderData s ? s.scale : data instanceof ClientHudData.StaticTextRenderData t ? t.scale : data instanceof ClientHudData.ImageRenderData i ? i.scale : data instanceof ClientHudData.RadarRenderData r ? r.scale : 1f; }
+        public float getRotation() { return data instanceof ClientHudData.SlotRenderData s ? s.rotation : data instanceof ClientHudData.StaticTextRenderData t ? t.rotation : data instanceof ClientHudData.ImageRenderData i ? i.rotation : data instanceof ClientHudData.RadarRenderData r ? r.rotation : 0f; }
+        public int getColor() { return data instanceof ClientHudData.SlotRenderData s ? s.color : data instanceof ClientHudData.StaticTextRenderData t ? t.color : 0xFFFFFF; }
+        public int getAlpha() { return data instanceof ClientHudData.SlotRenderData s ? s.alpha : data instanceof ClientHudData.StaticTextRenderData t ? t.alpha : data instanceof ClientHudData.ImageRenderData i ? i.alpha : data instanceof ClientHudData.RadarRenderData r ? r.alpha : 255; }
+        public void setPosX(float v) {} public void setPosY(float v) {} public void setScale(float v) {}
+        public void setRotation(float v) {} public void setColor(int v) {} public void setAlpha(int v) {}
     }
 
     private static int getTC(int c) {

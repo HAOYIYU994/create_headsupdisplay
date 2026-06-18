@@ -1,9 +1,12 @@
 package com.github.haoyiyu.create_headsupdisplay.block;
 
+import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
 import com.github.haoyiyu.create_headsupdisplay.config.DisplaySlot;
 import com.github.haoyiyu.create_headsupdisplay.config.ImageSlot;
 import com.github.haoyiyu.create_headsupdisplay.config.ProLayer;
+import com.github.haoyiyu.create_headsupdisplay.config.AnimationIO;
 import com.github.haoyiyu.create_headsupdisplay.config.RadarSlot;
+import com.github.haoyiyu.create_headsupdisplay.config.SlotAnimation;
 import com.github.haoyiyu.create_headsupdisplay.config.StaticTextSlot;
 import com.github.haoyiyu.create_headsupdisplay.network.OpenTerminalProConfigScreenPayload;
 import com.github.haoyiyu.create_headsupdisplay.network.SyncDisplayDataPayload;
@@ -135,7 +138,12 @@ public class DisplayTerminalProBlockEntity extends BlockEntity {
     /** 旧兼容：通过 sourcePos 找第一个槽位更新 */
     public void updateSlotConfig(BlockPos sourcePos, int posX, int posY, float scale, float rotation, int color, int alpha) {
         DisplaySlot slot = findSlot(sourcePos);
-        if (slot == null) { slot = new DisplaySlot(sourcePos); slot.setSlotId(nextSlotId++); getLayer(0).addSlot(slot); }
+        if (slot == null) {
+            slot = new DisplaySlot(sourcePos); slot.setSlotId(nextSlotId++); getLayer(0).addSlot(slot);
+            // Populate data from source cache so the display shows immediately
+            String cached = sourceCache.get(sourcePos);
+            if (cached != null) { slot.setLastData(cached); slot.setSourceName(sourceNameCache.getOrDefault(sourcePos, "")); }
+        }
         slot.setPos(posX, posY); slot.setScale(scale); slot.setRotation(rotation);
         slot.setColor(color); slot.setAlpha(alpha);
         setChanged(); syncToBoundPlayers();
@@ -316,6 +324,7 @@ public class DisplayTerminalProBlockEntity extends BlockEntity {
             t.putFloat("scale", st.getScale()); t.putFloat("rotation", st.getRotation());
             t.putInt("color", st.getColor()); t.putInt("alpha", st.getAlpha());
             t.putInt("layerIndex", staticTextLayer.get(i));
+            AnimationIO.write(t, st.getAnimations());
             stTag.add(t);
         }
         full.put("StaticTexts", stTag);
@@ -347,7 +356,11 @@ public class DisplayTerminalProBlockEntity extends BlockEntity {
                 CompoundTag fd = new CompoundTag();
                 fd.putLong("sourcePos", s.getSourcePos().asLong());
                 fd.putInt("posX", s.getPosX()); fd.putInt("posY", s.getPosY());
-                fd.putFloat("scale", s.getScale()); fd.putString("text", s.getLastData());
+                fd.putFloat("scale", s.getScale());
+                String slotText = s.getLastData();
+                if ((slotText == null || slotText.isEmpty()) && sourceCache.containsKey(s.getSourcePos()))
+                    slotText = sourceCache.get(s.getSourcePos());
+                fd.putString("text", slotText);
                 fd.putInt("displayLine", s.getDisplayLine()); fd.putFloat("rotation", s.getRotation());
                 fd.putInt("DisplayMode", s.getDisplayMode());
                 if (s.getDisplayModeId() != null) fd.putString("DisplayModeId", s.getDisplayModeId().toString());
@@ -359,9 +372,12 @@ public class DisplayTerminalProBlockEntity extends BlockEntity {
                     for (String v : s.getDataValues()) { var dt = new CompoundTag(); dt.putString("Val", v != null ? v : ""); dv.add(dt); }
                     fd.put("DataValues", dv);
                 }
-                net.minecraft.nbt.ListTag animSync = new net.minecraft.nbt.ListTag();
-                for (var a : s.getAnimations()) animSync.add(a.serialize());
-                fd.put("Animations", animSync);
+                if (!s.getSourceNames().isEmpty()) {
+                    var sn = new net.minecraft.nbt.ListTag();
+                    for (String n : s.getSourceNames()) { var nt = new CompoundTag(); nt.putString("Nm", n != null ? n : ""); sn.add(nt); }
+                    fd.put("SourceNames", sn);
+                }
+                AnimationIO.write(fd, s.getAnimations());
                 fd.putInt("color", s.getColor()); fd.putInt("alpha", s.getAlpha());
                 fd.putInt("layerIndex", li);
                 flatSlots.add(fd);
@@ -380,6 +396,7 @@ public class DisplayTerminalProBlockEntity extends BlockEntity {
             ft.putFloat("scale", st.getScale()); ft.putFloat("rotation", st.getRotation());
             ft.putInt("color", st.getColor()); ft.putInt("alpha", st.getAlpha());
             ft.putInt("layerIndex", li);
+            AnimationIO.write(ft, st.getAnimations());
             flatStatic.add(ft);
         }
         full.putInt("staticCount", flatStatic.size());
@@ -470,6 +487,7 @@ public class DisplayTerminalProBlockEntity extends BlockEntity {
             t.putFloat("scale", st.getScale()); t.putFloat("rotation", st.getRotation());
             t.putInt("color", st.getColor()); t.putInt("alpha", st.getAlpha());
             t.putInt("layerIndex", staticTextLayer.get(i));
+            AnimationIO.write(t, st.getAnimations());
             stTag.add(t);
         }
         full.put("StaticTexts", stTag);
@@ -557,6 +575,7 @@ public class DisplayTerminalProBlockEntity extends BlockEntity {
             t.putFloat("scale", s.getScale()); t.putFloat("rotation", s.getRotation());
             t.putInt("color", s.getColor()); t.putInt("alpha", s.getAlpha());
             t.putInt("layerIndex", staticTextLayer.get(i));
+            AnimationIO.write(t, s.getAnimations());
             st.add(t);
         }
         tag.put("StaticTexts", st);
@@ -613,8 +632,10 @@ public class DisplayTerminalProBlockEntity extends BlockEntity {
             ListTag st = tag.getList("StaticTexts", CompoundTag.TAG_COMPOUND);
             for (int i = 0; i < st.size(); i++) {
                 CompoundTag t = st.getCompound(i);
-                staticTextSlots.add(new StaticTextSlot(t.getString("text"), t.getInt("posX"), t.getInt("posY"),
-                        t.getFloat("scale"), t.getFloat("rotation"), t.getInt("color"), t.getInt("alpha")));
+                StaticTextSlot s = new StaticTextSlot(t.getString("text"), t.getInt("posX"), t.getInt("posY"),
+                        t.getFloat("scale"), t.getFloat("rotation"), t.getInt("color"), t.getInt("alpha"));
+                AnimationIO.read(t, s.getAnimations());
+                staticTextSlots.add(s);
                 staticTextLayer.add(t.getInt("layerIndex"));
             }
         }
@@ -665,8 +686,10 @@ public class DisplayTerminalProBlockEntity extends BlockEntity {
             ListTag st = data.getList("StaticTexts", CompoundTag.TAG_COMPOUND);
             for (int i = 0; i < st.size(); i++) {
                 CompoundTag t = st.getCompound(i);
-                staticTextSlots.add(new StaticTextSlot(t.getString("text"), t.getInt("posX"), t.getInt("posY"),
-                        t.getFloat("scale"), t.getFloat("rotation"), t.getInt("color"), t.getInt("alpha")));
+                StaticTextSlot s = new StaticTextSlot(t.getString("text"), t.getInt("posX"), t.getInt("posY"),
+                        t.getFloat("scale"), t.getFloat("rotation"), t.getInt("color"), t.getInt("alpha"));
+                AnimationIO.read(t, s.getAnimations());
+                staticTextSlots.add(s);
                 staticTextLayer.add(t.getInt("layerIndex"));
             }
         }

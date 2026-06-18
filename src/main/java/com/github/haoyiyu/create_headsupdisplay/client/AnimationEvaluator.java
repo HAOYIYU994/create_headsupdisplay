@@ -39,13 +39,47 @@ public class AnimationEvaluator {
         long now = System.currentTimeMillis();
 
         for (SlotAnimation anim : animations) {
-            if (!anim.isActive(dataText)) continue;
-            if (anim.keyframes.size() < 2) continue;
+            boolean active = anim.isActive(dataText);
+            if (anim.keyframes.size() < 2) {
+                anim.setWasActive(active);
+                continue;
+            }
 
-            float t = ((now % (long)(anim.cycleTime * 1000f)) / (anim.cycleTime * 1000f));
-            if (!anim.loop) t = Mth.clamp(t, 0f, 1f);
+            float t;
+            if (active) {
+                anim.setWasActive(true);
+                t = computeProgress(now, anim);
+            } else if (anim.getWasActive() && anim.endBehavior == SlotAnimation.EndBehavior.STOP) {
+                anim.setWasActive(false);
+                continue;
+            } else if (anim.getWasActive() && anim.endBehavior == SlotAnimation.EndBehavior.FINISH) {
+                long elapsed = now - anim.getDeactivateStart();
+                float remaining = (1f - anim.getDeactivateProgress()) * anim.cycleTime * 1000f;
+                if (elapsed >= remaining) { anim.setWasActive(false); continue; }
+                t = anim.getDeactivateProgress() + elapsed / (anim.cycleTime * 1000f);
+            } else if (anim.getWasActive() && anim.endBehavior == SlotAnimation.EndBehavior.HOLD) {
+                t = anim.getDeactivateProgress();
+            } else if (anim.getWasActive() && anim.endBehavior == SlotAnimation.EndBehavior.REVERSE) {
+                long elapsed = now - anim.getDeactivateStart();
+                float revDuration = anim.getDeactivateProgress() * anim.cycleTime * 1000f;
+                if (elapsed >= revDuration) { anim.setWasActive(false); continue; }
+                t = anim.getDeactivateProgress() - elapsed / (anim.cycleTime * 1000f);
+            } else {
+                if (active) anim.setWasActive(true);
+                else { anim.setWasActive(false); continue; }
+                t = computeProgress(now, anim);
+            }
 
-            // 找包围 t 的两个关键帧
+            t = Mth.clamp(t, 0f, 1f);
+
+            // Record deactivate state once when trigger first goes false
+            if (anim.getWasActive() && !active && anim.endBehavior != SlotAnimation.EndBehavior.STOP) {
+                if (anim.getDeactivateStart() == 0 || anim.getDeactivateStart() > now - 100) {
+                    anim.setDeactivateProgress(computeProgress(now, anim));
+                    anim.setDeactivateStart(now);
+                }
+            }
+
             SlotAnimation.Keyframe k0 = null, k1 = null;
             for (SlotAnimation.Keyframe k : anim.keyframes) {
                 if (k.time <= t && (k0 == null || k.time >= k0.time)) k0 = k;
@@ -56,7 +90,6 @@ public class AnimationEvaluator {
 
             float blend = (k1.time == k0.time) ? 0f : Mth.clamp((t - k0.time) / (k1.time - k0.time), 0f, 1f);
 
-            // 插值各属性
             interpolate(out, "posX", base.getPosX(), k0, k1, blend);
             interpolate(out, "posY", base.getPosY(), k0, k1, blend);
             interpolate(out, "scale", base.getScale(), k0, k1, blend);
@@ -64,6 +97,12 @@ public class AnimationEvaluator {
             interpolateInt(out, "color", base.getColor(), k0, k1, blend);
             interpolateInt(out, "alpha", base.getAlpha(), k0, k1, blend);
         }
+    }
+
+    private static float computeProgress(long now, SlotAnimation anim) {
+        float t = ((now % (long)(anim.cycleTime * 1000f)) / (anim.cycleTime * 1000f));
+        if (!anim.loop) t = Mth.clamp(t, 0f, 1f);
+        return t;
     }
 
     private static void interpolate(Result out, String prop, float base, SlotAnimation.Keyframe k0, SlotAnimation.Keyframe k1, float t) {

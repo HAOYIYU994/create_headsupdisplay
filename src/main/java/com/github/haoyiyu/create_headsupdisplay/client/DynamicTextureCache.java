@@ -26,15 +26,21 @@ public class DynamicTextureCache {
     private static int maxBytes() { return com.github.haoyiyu.create_headsupdisplay.config.ModConfig.IMAGE_MAX_SIZE_KB.get() * 1024; }
 
     /**
-     * 获取或创建纹理（普通图片，缓存后不更新）。
+     * 获取或创建纹理。优先从本地缓存加载；若无缓存则使用传入的 bytes 并写入磁盘。
      */
     public static ResourceLocation getOrCreate(UUID imageId, byte[] pngBytes) {
         if (CACHE.containsKey(imageId)) {
             return CACHE.get(imageId);
         }
-        if (pngBytes == null || pngBytes.length > maxBytes()) return null;
+        // Prefer local disk cache over network bytes
+        byte[] src = ImageCache.load(imageId);
+        if (src == null && pngBytes != null && pngBytes.length <= maxBytes()) {
+            src = pngBytes;
+            ImageCache.save(imageId, pngBytes);
+        }
+        if (src == null || src.length > maxBytes()) return null;
         try {
-            ByteArrayInputStream in = new ByteArrayInputStream(pngBytes);
+            ByteArrayInputStream in = new ByteArrayInputStream(src);
             NativeImage nativeImage = NativeImage.read(in);
             in.close();
             DynamicTexture texture = new DynamicTexture(nativeImage);
@@ -75,9 +81,11 @@ public class DynamicTextureCache {
         } catch (IOException e) { return CACHE.get(imageId); }
     }
 
-    /** 仅在数据变化时更新纹理（由数据到达时调用，避免每帧重复上传） */
+    /** 仅在数据变化时更新纹理（由数据到达时调用，避免每帧重复上传）。首次写入本地缓存。 */
     public static void ensureUpdated(UUID imageId, byte[] pngBytes) {
         if (pngBytes == null || pngBytes.length > maxBytes()) return;
+        // Write to local disk cache so future sessions can reload without network
+        ImageCache.save(imageId, pngBytes);
         int newHash = Arrays.hashCode(pngBytes);
         Integer oldHash = HASH_CACHE.get(imageId);
         if (oldHash != null && oldHash == newHash) return; // 未变化，跳过
