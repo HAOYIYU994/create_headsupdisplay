@@ -1,6 +1,7 @@
 package com.github.haoyiyu.create_headsupdisplay.network;
 
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
+import com.github.haoyiyu.create_headsupdisplay.client.ClientPayloadHandlers;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -19,5 +20,9 @@ public record OpenTerminalConfigScreenPayload(CompoundTag slotsData) implements 
     @Override
     public Type<? extends CustomPacketPayload> type() {
         return TYPE;
+    }
+
+    public static void handle(OpenTerminalConfigScreenPayload payload, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() -> ClientPayloadHandlers.openTerminalConfigScreen(payload.slotsData()));
     }
 }

@@ -1,8 +1,7 @@
 package com.github.haoyiyu.create_headsupdisplay.network;
 
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
-import com.github.haoyiyu.create_headsupdisplay.screen.NbtReaderScreen;
-import net.minecraft.client.Minecraft;
+import com.github.haoyiyu.create_headsupdisplay.client.ClientPayloadHandlers;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -17,6 +16,6 @@ public record OpenNbtReaderScreenPayload(CompoundTag data) implements CustomPack
             StreamCodec.composite(ByteBufCodecs.COMPOUND_TAG, OpenNbtReaderScreenPayload::data, OpenNbtReaderScreenPayload::new);
     @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
     public static void handle(OpenNbtReaderScreenPayload p, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
-        ctx.enqueueWork(() -> Minecraft.getInstance().setScreen(new NbtReaderScreen(p.data())));
+        ctx.enqueueWork(() -> ClientPayloadHandlers.openNbtReaderScreen(p.data()));
     }
 }

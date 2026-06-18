@@ -1,8 +1,7 @@
 package com.github.haoyiyu.create_headsupdisplay.network;
 
 import com.github.haoyiyu.create_headsupdisplay.CreateHeadsUpDisplay;
-import com.github.haoyiyu.create_headsupdisplay.screen.OmniCoreScreen;
-import net.minecraft.client.Minecraft;
+import com.github.haoyiyu.create_headsupdisplay.client.ClientPayloadHandlers;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -25,6 +24,6 @@ public record OpenOmniCoreScreenPayload(CompoundTag data) implements CustomPacke
     }
 
     public static void handle(OpenOmniCoreScreenPayload payload, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
-        ctx.enqueueWork(() -> Minecraft.getInstance().setScreen(new OmniCoreScreen(payload.data)));
+        ctx.enqueueWork(() -> ClientPayloadHandlers.openOmniCoreScreen(payload.data()));
     }
 }

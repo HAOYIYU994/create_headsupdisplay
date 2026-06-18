@@ -20,4 +20,8 @@ public record SyncDisplayDataPayload(CompoundTag data) implements CustomPacketPa
     public Type<? extends CustomPacketPayload> type() {
         return TYPE;
     }
+
+    public static void handle(SyncDisplayDataPayload payload, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() -> com.github.haoyiyu.create_headsupdisplay.client.ClientHudData.updateDisplayData(payload.data()));
+    }
 }

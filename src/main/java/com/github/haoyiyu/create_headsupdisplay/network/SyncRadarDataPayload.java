@@ -43,6 +43,12 @@ public record SyncRadarDataPayload(java.util.List<RadarTrackEntry> tracks, float
 
     @Override public Type<? extends CustomPacketPayload> type() { return TYPE; }
 
+    public static void handle(SyncRadarDataPayload payload, net.neoforged.neoforge.network.handling.IPayloadContext ctx) {
+        ctx.enqueueWork(() -> com.github.haoyiyu.create_headsupdisplay.client.ClientHudData.updateRadarTracks(
+                payload.tracks(), payload.sweepAngle(), payload.radarRange(),
+                payload.radarX(), payload.radarY(), payload.radarZ()));
+    }
+
     public record RadarTrackEntry(String id, double x, double y, double z,
                                    double vx, double vy, double vz,
                                    int categoryOrdinal, String entityType) {}

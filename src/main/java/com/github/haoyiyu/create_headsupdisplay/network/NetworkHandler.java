@@ -4,7 +4,6 @@ import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalBlockEntity
 import com.github.haoyiyu.create_headsupdisplay.block.DisplayTerminalProBlockEntity;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
-import net.neoforged.fml.loading.FMLEnvironment;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 
@@ -274,52 +273,27 @@ public class NetworkHandler {
                 UpdateNbtReaderConfigPayload::handle
         );
 
-        // ========== Client-only registrations (crash on dedicated server) ==========
-        if (FMLEnvironment.dist.isClient()) registerClientPayloads(registrar);
+        // ========== HUD 显示同步 + 客户端屏幕 ==========
+        registrar.playToClient(
+                SyncDisplayDataPayload.TYPE,
+                SyncDisplayDataPayload.CODEC,
+                SyncDisplayDataPayload::handle
+        );
+        registrar.playToClient(
+                OpenTerminalConfigScreenPayload.TYPE,
+                OpenTerminalConfigScreenPayload.CODEC,
+                OpenTerminalConfigScreenPayload::handle
+        );
+        registrar.playToClient(
+                OpenTerminalProConfigScreenPayload.TYPE,
+                OpenTerminalProConfigScreenPayload.CODEC,
+                OpenTerminalProConfigScreenPayload::handle
+        );
+        registrar.playToClient(
+                SyncRadarDataPayload.TYPE,
+                SyncRadarDataPayload.CODEC,
+                SyncRadarDataPayload::handle
+        );
     }
 
-    private static void registerClientPayloads(PayloadRegistrar registrar) {
-        registrar.playToClient(
-                com.github.haoyiyu.create_headsupdisplay.network.SyncDisplayDataPayload.TYPE,
-                com.github.haoyiyu.create_headsupdisplay.network.SyncDisplayDataPayload.CODEC,
-                (payload, context) -> context.enqueueWork(() ->
-                    com.github.haoyiyu.create_headsupdisplay.client.ClientHudData.updateDisplayData(payload.data()))
-        );
-        registrar.playToClient(
-                com.github.haoyiyu.create_headsupdisplay.network.OpenTerminalConfigScreenPayload.TYPE,
-                com.github.haoyiyu.create_headsupdisplay.network.OpenTerminalConfigScreenPayload.CODEC,
-                (payload, context) -> context.enqueueWork(() ->
-                    net.minecraft.client.Minecraft.getInstance().setScreen(
-                        new com.github.haoyiyu.create_headsupdisplay.screen.TerminalConfigScreen(payload.slotsData())))
-        );
-        registrar.playToClient(
-                com.github.haoyiyu.create_headsupdisplay.network.OpenTerminalProConfigScreenPayload.TYPE,
-                com.github.haoyiyu.create_headsupdisplay.network.OpenTerminalProConfigScreenPayload.CODEC,
-                (payload, context) -> context.enqueueWork(() ->
-                    net.minecraft.client.Minecraft.getInstance().setScreen(
-                        new com.github.haoyiyu.create_headsupdisplay.screen.TerminalProConfigScreen(payload.slotsData())))
-        );
-        registrar.playToClient(
-                com.github.haoyiyu.create_headsupdisplay.network.OpenOmniCoreScreenPayload.TYPE,
-                com.github.haoyiyu.create_headsupdisplay.network.OpenOmniCoreScreenPayload.CODEC,
-                com.github.haoyiyu.create_headsupdisplay.network.OpenOmniCoreScreenPayload::handle
-        );
-        registrar.playToClient(
-                com.github.haoyiyu.create_headsupdisplay.network.SyncSourcesDataPayload.TYPE,
-                com.github.haoyiyu.create_headsupdisplay.network.SyncSourcesDataPayload.CODEC,
-                com.github.haoyiyu.create_headsupdisplay.network.SyncSourcesDataPayload::handle
-        );
-        registrar.playToClient(
-                com.github.haoyiyu.create_headsupdisplay.network.OpenFrequencySelectionPayload.TYPE,
-                com.github.haoyiyu.create_headsupdisplay.network.OpenFrequencySelectionPayload.CODEC,
-                com.github.haoyiyu.create_headsupdisplay.network.OpenFrequencySelectionPayload::handle
-        );
-        registrar.playToClient(
-                com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.TYPE,
-                com.github.haoyiyu.create_headsupdisplay.network.SyncRadarDataPayload.CODEC,
-                (payload, context) -> context.enqueueWork(() ->
-                    com.github.haoyiyu.create_headsupdisplay.client.ClientHudData.updateRadarTracks(
-                        payload.tracks(), payload.sweepAngle(), payload.radarRange(), payload.radarX(), payload.radarY(), payload.radarZ()))
-        );
-    }
 }
