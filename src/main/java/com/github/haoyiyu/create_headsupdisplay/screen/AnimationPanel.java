@@ -40,6 +40,8 @@ public class AnimationPanel {
     }
     public void hide() { visible = false; }
     public boolean isVisible() { return visible; }
+    public int getPanelX() { return panelX; }
+    public int getPanelY() { return panelY; }
 
     public void render(GuiGraphics g, Font font, int mx, int my) {
         if (!visible) return;

@@ -1,0 +1,33 @@
+{
+  "display": {
+    "title": {
+      "translate": "advancement.create_headsupdisplay.plugin_base.title"
+    },
+    "description": {
+      "translate": "advancement.create_headsupdisplay.plugin_base.description"
+    },
+    "icon": {
+      "id": "create_headsupdisplay:plugin_base"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "parent": "create_headsupdisplay:main/omni_core",
+  "criteria": {
+    "has_plugin_base": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "create_headsupdisplay:plugin_base"
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    ["has_plugin_base"]
+  ]
+}

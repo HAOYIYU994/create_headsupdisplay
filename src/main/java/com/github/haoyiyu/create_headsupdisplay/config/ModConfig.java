@@ -29,8 +29,8 @@ public class ModConfig {
         ModConfigSpec.Builder clientBuilder = new ModConfigSpec.Builder();
         clientBuilder.push("editor");
         CANVAS_ZOOM = clientBuilder
-                .comment("Canvas zoom level for the Terminal Pro configuration screen. (default: 1.0, range: 0.25 ~ 1.0)")
-                .defineInRange("canvasZoom", 1.0, 0.25, 1.0);
+                .comment("Canvas zoom level for the Terminal Pro configuration screen. (default: 1.0, range: 0.01 ~ 1.0)")
+                .defineInRange("canvasZoom", 1.0, 0.01, 1.0);
         clientBuilder.pop();
         CLIENT_CONFIG = clientBuilder.build();
     }

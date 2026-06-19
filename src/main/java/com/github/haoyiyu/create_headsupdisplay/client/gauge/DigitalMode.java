@@ -29,7 +29,7 @@ public class DigitalMode implements IDisplayMode {
         BG = reg.register("digital_bg", img);
     }
     @Override
-    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h) {
+    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h, int color, int alpha) {
         float val=GaugeUtil.parseFloat(dataValues.get(0)); String unit=config.getUnit();
         String num=String.format("%.1f",val); int nw=font.width(num);
         RenderSystem.enableBlend();

@@ -34,6 +34,8 @@ public class ProLayerPanel {
     public void show(int x, int y) { panelX = x; panelY = y; visible = true; }
     public void hide() { visible = false; }
     public boolean isVisible() { return visible; }
+    public int getPanelX() { return panelX; }
+    public int getPanelY() { return panelY; }
 
     public List<LayerInfo> getLayers() { return layers; }
     public int getCurrentLayer() { return currentLayer; }

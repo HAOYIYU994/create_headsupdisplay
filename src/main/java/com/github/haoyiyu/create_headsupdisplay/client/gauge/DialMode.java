@@ -43,7 +43,7 @@ public class DialMode implements IDisplayMode {
         NEEDLE=reg.register("dial_needle",n);
     }
     @Override
-    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h) {
+    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h, int color, int alpha) {
         float val=GaugeUtil.parseFloat(dataValues.get(0)), mv=config.getMax(); String u=config.getUnit();
         float pct=Mth.clamp(mv>0?val/mv:0f,0f,1f);
         int r=Math.min(w,h)/2-4, cx=w/2, cy=h/2+4;

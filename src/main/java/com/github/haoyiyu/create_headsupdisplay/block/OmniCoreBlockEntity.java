@@ -639,9 +639,8 @@ public class OmniCoreBlockEntity extends BlockEntity {
             } else if (be instanceof DisplayTerminalProBlockEntity terminalPro) {
                 terminalPro.getSourceCache().put(virtualPos, displayText);
                 terminalPro.getSourceNameCache().put(virtualPos, cleanName);
-                if (terminalPro.findSlot(virtualPos) != null) {
-                    terminalPro.updateSlotDataAndStyle(virtualPos, displayText, 0, cleanName);
-                }
+                // 直接更新槽位数据，不依赖 findSlot 守卫（与 DisplayLink 路径行为一致）
+                terminalPro.updateSlotDataAndStyle(virtualPos, displayText, 0, cleanName);
                 terminalPro.setChanged();
                 terminalPro.syncToBoundPlayers();
             }
@@ -794,10 +793,8 @@ public class OmniCoreBlockEntity extends BlockEntity {
         // 存入数据源缓存（不入画布）
         terminal.getSourceCache().put(virtualPos, displayText);
         terminal.getSourceNameCache().put(virtualPos, cleanName);
-        // 如果画布上已有槽位，同步更新数据
-        if (terminal.findSlot(virtualPos) != null) {
-            terminal.updateSlotDataAndStyle(virtualPos, displayText, 0, cleanName);
-        }
+        // 直接更新槽位数据（updateSlotDataAndStyle 内部遍历所有槽位，无匹配则空操作）
+        terminal.updateSlotDataAndStyle(virtualPos, displayText, 0, cleanName);
         terminal.setChanged();
         terminal.syncToBoundPlayers();
     }
@@ -989,7 +986,7 @@ public class OmniCoreBlockEntity extends BlockEntity {
                     foundAny = true;
                     terminalPro.getSourceCache().put(virtualPos, newText);
                     terminalPro.setChanged();
-                    if (terminalPro.findSlot(virtualPos) != null && !newText.equals(src.lastSentText)) {
+                    if (!newText.equals(src.lastSentText)) {
                         terminalPro.updateSlotData(virtualPos, newText);
                     }
                 }

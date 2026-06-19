@@ -34,7 +34,7 @@ public class AltimeterMode implements IDisplayMode {
         SCALE = reg.register("altimeter_scale", img);
     }
     @Override
-    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h) {
+    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h, int color, int alpha) {
         float val = GaugeUtil.parseFloat(dataValues.get(0));
         float min=config.getMin(), max=config.getMax(); String u=config.getUnit();
         if (max<=min) max=min+100f;

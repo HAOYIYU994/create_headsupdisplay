@@ -1,0 +1,33 @@
+{
+  "display": {
+    "title": {
+      "translate": "advancement.create_headsupdisplay.nbt_reader.title"
+    },
+    "description": {
+      "translate": "advancement.create_headsupdisplay.nbt_reader.description"
+    },
+    "icon": {
+      "id": "create_headsupdisplay:nbt_reader"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": true
+  },
+  "parent": "create_headsupdisplay:main/root",
+  "criteria": {
+    "has_nbt_reader": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "create_headsupdisplay:nbt_reader"
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    ["has_nbt_reader"]
+  ]
+}

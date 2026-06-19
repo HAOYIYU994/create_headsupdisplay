@@ -179,11 +179,18 @@ public class DisplayTerminalProBlockEntity extends BlockEntity {
 
     public void updateSlotDataAndStyle(BlockPos sourcePos, String text, int line, String sourceName) {
         for (ProLayer layer : layers)
-            for (DisplaySlot s : layer.getSlots())
-                if (s.getSourcePos().equals(sourcePos)) {
+            for (DisplaySlot s : layer.getSlots()) {
+                int idx = s.getSourcePositions().indexOf(sourcePos);
+                if (idx >= 0) {
+                    s.setDataValue(idx, text);
+                    s.setLastData(text);
+                    s.setDisplayLine(line);
+                    if (sourceName != null) s.setSourceName(sourceName);
+                } else if (s.getSourcePos().equals(sourcePos)) {
                     s.setLastData(text); s.setDisplayLine(line);
                     if (sourceName != null) s.setSourceName(sourceName);
                 }
+            }
         setChanged(); syncToBoundPlayers();
     }
 

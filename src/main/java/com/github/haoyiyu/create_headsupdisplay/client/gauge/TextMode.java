@@ -19,8 +19,9 @@ public class TextMode implements IDisplayMode {
     @Override public int getDefaultHeight() { return 20; }
     @Override public Component getDisplayName() { return Component.translatable("gui.create_headsupdisplay.pro.display_mode.text"); }
     @Override
-    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h) {
+    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h, int color, int alpha) {
         String text = dataValues.isEmpty() ? "" : dataValues.get(0);
-        g.drawString(font, text, 0, 4, 0xFFFFFFFF, true);
+        int argb = (alpha << 24) | (color & 0x00FFFFFF);
+        g.drawString(font, text, 0, 4, argb, true);
     }
 }

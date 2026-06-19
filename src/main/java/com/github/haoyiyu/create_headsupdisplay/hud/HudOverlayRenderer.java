@@ -270,7 +270,7 @@ public class HudOverlayRenderer {
                     : com.github.haoyiyu.create_headsupdisplay.api.DisplayModeRegistry.get(slot.displayMode);
                 if (mode != null) {
                     mode.render(g, font, slot.dataValues, slot.modeConfig,
-                        mode.getDefaultWidth(), mode.getDefaultHeight());
+                        mode.getDefaultWidth(), mode.getDefaultHeight(), animColor, animAlpha);
                 } else {
                     g.drawString(font, text, 0, 0, tc, true);
                 }

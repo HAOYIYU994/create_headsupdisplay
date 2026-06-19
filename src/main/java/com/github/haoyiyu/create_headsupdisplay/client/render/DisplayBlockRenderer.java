@@ -284,7 +284,6 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
                     float labelY = ty + trackSize - size / 5f;
                     pose.pushPose();
                     pose.translate(tx, labelY, 0.01f);
-                    pose.scale(0.1f, 0.1f, 1f);
                     font.drawInBatch(name, -font.width(name)/2f, 0, 0xFFFFFFFF,
                             false, pose.last().pose(), buffer, Font.DisplayMode.NORMAL, 0, light);
                     pose.popPose();
@@ -446,8 +445,10 @@ public class DisplayBlockRenderer extends SmartBlockEntityRenderer<DisplayBlockE
         g.pose().scale(aS, aS, 1f);
         g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(aR));
 
+        int slotColor = animRes.color != null ? animRes.color : slot.color;
+        int slotAlpha = animRes.alpha != null ? animRes.alpha : slot.alpha;
         mode.render(g, font, slot.dataValues, slot.modeConfig,
-                    mode.getDefaultWidth(), mode.getDefaultHeight());
+                    mode.getDefaultWidth(), mode.getDefaultHeight(), slotColor, slotAlpha);
 
         g.pose().popPose();
         g.flush();

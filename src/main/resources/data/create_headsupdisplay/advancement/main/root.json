@@ -1,0 +1,23 @@
+{
+  "display": {
+    "title": {
+      "translate": "advancement.create_headsupdisplay.root.title"
+    },
+    "description": {
+      "translate": "advancement.create_headsupdisplay.root.description"
+    },
+    "icon": {
+      "id": "create_headsupdisplay:head_mount_display"
+    },
+    "background": "create:textures/block/brass_block.png",
+    "frame": "task",
+    "show_toast": false,
+    "announce_to_chat": false,
+    "hidden": false
+  },
+  "criteria": {
+    "has_create_item": {
+      "trigger": "minecraft:tick"
+    }
+  }
+}

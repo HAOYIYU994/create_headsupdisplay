@@ -1,0 +1,33 @@
+{
+  "display": {
+    "title": {
+      "translate": "advancement.create_headsupdisplay.pro_upgrade_kit.title"
+    },
+    "description": {
+      "translate": "advancement.create_headsupdisplay.pro_upgrade_kit.description"
+    },
+    "icon": {
+      "id": "create_headsupdisplay:pro_upgrade_kit"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "parent": "create_headsupdisplay:main/root",
+  "criteria": {
+    "has_pro_upgrade_kit": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "create_headsupdisplay:pro_upgrade_kit"
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    ["has_pro_upgrade_kit"]
+  ]
+}

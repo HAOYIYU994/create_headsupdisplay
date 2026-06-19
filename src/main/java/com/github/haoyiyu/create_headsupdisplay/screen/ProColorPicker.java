@@ -73,6 +73,8 @@ public class ProColorPicker {
 
     public void hide() { this.visible = false; }
     public boolean isVisible() { return visible; }
+    public int getPanelX() { return panelX; }
+    public int getPanelY() { return panelY; }
 
     public void render(GuiGraphics g, net.minecraft.client.gui.Font font, int mouseX, int mouseY) {
         if (!visible) return;

@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "create:display_link" },
+    { "item": "create:pulse_timer" }
+  ],
+  "result": {
+    "id": "create_headsupdisplay:fast_display_link",
+    "count": 1
+  }
+}

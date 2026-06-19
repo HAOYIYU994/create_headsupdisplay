@@ -1,0 +1,35 @@
+{
+  "type": "create:sequenced_assembly",
+  "ingredient": {
+    "item": "create_headsupdisplay:link_block"
+  },
+  "loops": 50,
+  "results": [
+    {
+      "id": "create_headsupdisplay:nbt_reader"
+    }
+  ],
+  "sequence": [
+    {
+      "type": "create:cutting",
+      "ingredients": [
+        { "item": "create_headsupdisplay:nbt_reader" }
+      ],
+      "results": [
+        { "id": "create_headsupdisplay:nbt_reader" }
+      ]
+    },
+    {
+      "type": "create:pressing",
+      "ingredients": [
+        { "item": "create_headsupdisplay:nbt_reader" }
+      ],
+      "results": [
+        { "id": "create_headsupdisplay:nbt_reader" }
+      ]
+    }
+  ],
+  "transitional_item": {
+    "id": "create_headsupdisplay:nbt_reader"
+  }
+}

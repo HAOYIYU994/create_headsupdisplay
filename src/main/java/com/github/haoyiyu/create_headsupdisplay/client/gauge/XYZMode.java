@@ -20,7 +20,7 @@ public class XYZMode implements IDisplayMode {
         return List.of(ConfigParamDescriptor.of("labelX",ConfigParamType.STRING,"X"), ConfigParamDescriptor.of("labelY",ConfigParamType.STRING,"Y"), ConfigParamDescriptor.of("labelZ",ConfigParamType.STRING,"Z"), ConfigParamDescriptor.of("unit",ConfigParamType.STRING,""));
     }
     @Override
-    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h) {
+    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h, int color, int alpha) {
         String lx=config.getString("labelX","X"),ly=config.getString("labelY","Y"),lz=config.getString("labelZ","Z"),u=config.getUnit();
         String vx=dataValues.size()>0?dataValues.get(0).replaceAll("§[0-9a-fk-or]","").trim():"?";
         String vy=dataValues.size()>1?dataValues.get(1).replaceAll("§[0-9a-fk-or]","").trim():"?";

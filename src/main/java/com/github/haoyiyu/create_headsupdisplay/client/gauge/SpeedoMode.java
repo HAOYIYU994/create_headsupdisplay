@@ -36,7 +36,7 @@ public class SpeedoMode implements IDisplayMode {
         NEEDLE=reg.register("speedo_needle",n);
     }
     @Override
-    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h) {
+    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h, int color, int alpha) {
         float val=GaugeUtil.parseFloat(dataValues.get(0)), pct=Mth.clamp(config.getMax()>0?val/config.getMax():0f,0f,1f);
         int cx=w/2,cy=h-10,r=Math.min(w,cy)-4;
         RenderSystem.enableBlend();

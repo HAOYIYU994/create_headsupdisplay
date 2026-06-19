@@ -23,7 +23,7 @@ public class ModItems {
             () -> new BlockItem(ModBlocks.DISPLAY_TERMINAL.get(), new Item.Properties()));
 
     public static final DeferredItem<BlockItem> DISPLAY_TERMINAL_PRO_ITEM = ITEMS.register("display_terminal_pro",
-            () -> new BlockItem(ModBlocks.DISPLAY_TERMINAL_PRO.get(), new Item.Properties()));
+            () -> new BlockItem(ModBlocks.DISPLAY_TERMINAL_PRO.get(), new Item.Properties().rarity(net.minecraft.world.item.Rarity.UNCOMMON)));
 
     // 新增 OmniCore 物品
     public static final DeferredItem<OmniCoreItem> OMNI_CORE_ITEM = ITEMS.register("omni_core",
@@ -45,10 +45,13 @@ public class ModItems {
             () -> new PluginBaseItem(new Item.Properties().stacksTo(64)));
 
     public static final DeferredItem<BlockItem> NBT_READER_ITEM = ITEMS.register("nbt_reader",
-            () -> new BlockItem(ModBlocks.NBT_READER.get(), new Item.Properties()));
+            () -> new BlockItem(ModBlocks.NBT_READER.get(), new Item.Properties().rarity(net.minecraft.world.item.Rarity.EPIC)));
 
     public static final DeferredItem<BlockItem> FAST_DISPLAY_LINK_ITEM = ITEMS.register("fast_display_link",
             FastDisplayLinkBlockItem::new);
+
+    public static final DeferredItem<Item> PRO_UPGRADE_KIT = ITEMS.register("pro_upgrade_kit",
+            () -> new Item(new Item.Properties().stacksTo(64)));
 
     public static void register(net.neoforged.bus.api.IEventBus bus) {
         ITEMS.register(bus);

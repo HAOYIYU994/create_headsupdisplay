@@ -93,8 +93,12 @@
   "tooltip.create_headsupdisplay.display_terminal.line5": "§8» §7透明度（Alpha）滑块位于颜色编辑面板内",
   "tooltip.create_headsupdisplay.display_terminal.line6": "§8» §7图片透明度：点击图片右上角A:xxx%按钮呼出透明度调节",
 
-  "tooltip.create_headsupdisplay.display_terminal_pro.line1": "§8» §7显示终端的专业版本",
-  "tooltip.create_headsupdisplay.display_terminal_pro.line2": "§8» §7待添加功能",
+  "tooltip.create_headsupdisplay.display_terminal_pro.line1": "§8» §7重新定义工业级数据可视化，超越想象的终极显示终端",
+  "tooltip.create_headsupdisplay.display_terminal_pro.line2": "§8» §7多图层叠加 · 十一种动态仪表 · HSV 精准调色 · 毫秒级响应",
+  "tooltip.create_headsupdisplay.display_terminal_pro.line3": "§8» §7内置§5动画引擎§7，关键帧驱动，让每一帧数据都成为艺术品",
+  "tooltip.create_headsupdisplay.display_terminal_pro.line4": "§8» §7凝滞空间锚定 · 雷达态势感知 · 图表趋势分析 · XYZ坐标追踪",
+  "tooltip.create_headsupdisplay.display_terminal_pro.line5": "§8» §7专业版专属升级套件打造，呈现工程之美的巅峰",
+  "tooltip.create_headsupdisplay.display_terminal_pro.line6": "§8» §5@2026 — 看见未来",
 
   "gui.create_headsupdisplay.pro.display_style": "显示样式",
   "gui.create_headsupdisplay.pro.display_mode.text": "文字",
@@ -184,6 +188,25 @@
   "gui.create_headsupdisplay.pro.tool_delete.tip": "删除",
   "gui.create_headsupdisplay.pro.tool_save": "💾",
   "gui.create_headsupdisplay.pro.tool_save.tip": "保存",
+  "gui.create_headsupdisplay.pro.tool_settings": "设置",
+
+  "gui.create_headsupdisplay.pro.settings.title": "专业版设置",
+  "gui.create_headsupdisplay.pro.settings.menu_bar_default": "默认展开编辑栏",
+  "gui.create_headsupdisplay.pro.settings.dock_default": "默认展开卡片栏",
+  "gui.create_headsupdisplay.pro.settings.image_zoom_preview": "图片缩放预览",
+  "gui.create_headsupdisplay.pro.settings.exit_behavior": "退出界面行为",
+  "gui.create_headsupdisplay.pro.settings.ui_theme": "界面风格",
+  "gui.create_headsupdisplay.pro.settings.open": "展开",
+  "gui.create_headsupdisplay.pro.settings.closed": "收起",
+  "gui.create_headsupdisplay.pro.settings.normal": "正常",
+  "gui.create_headsupdisplay.pro.settings.fixed": "不变",
+  "gui.create_headsupdisplay.pro.settings.exit_dont_save": "不保存",
+  "gui.create_headsupdisplay.pro.settings.exit_save": "直接保存",
+  "gui.create_headsupdisplay.pro.settings.exit_ask": "始终询问",
+  "gui.create_headsupdisplay.pro.settings.dark": "黑色",
+  "gui.create_headsupdisplay.pro.settings.light": "白色",
+  "gui.create_headsupdisplay.pro.exit_cancel": "取消",
+  "gui.create_headsupdisplay.pro.settings.restart_hint": "* 更改将在终端重启后生效",
 
   "tooltip.create_headsupdisplay.head_mount_display.line1": "§8» §7允许你查看已绑定显示终端的信息",
   "tooltip.create_headsupdisplay.head_mount_display.line2": "§8» §7shift+右键点击显示终端以绑定",
@@ -253,6 +276,30 @@
   "item.create_headsupdisplay.nbt_reader": "NBT读取器",
   "block.create_headsupdisplay.fast_display_link": "快速显示连接器",
   "item.create_headsupdisplay.fast_display_link": "快速显示连接器",
+  "item.create_headsupdisplay.pro_upgrade_kit": "显示终端pro升级套件 @2026",
+
+  "tooltip.create_headsupdisplay.pro_upgrade_kit.line1": "§7明显不是这个黄铜与蒸汽的时代该有的东西，所以也没有说明书，只能自己研究了",
+
+  "advancement.create_headsupdisplay.root.title": "Create: Heads Up Display",
+  "advancement.create_headsupdisplay.root.description": "一切关于数据的可视化",
+
+  "advancement.create_headsupdisplay.display_terminal.title": "显示，轻而易举啊！",
+  "advancement.create_headsupdisplay.display_terminal.description": "合成一台显示终端",
+
+  "advancement.create_headsupdisplay.plugin_base.title": "扩展功能是对的！",
+  "advancement.create_headsupdisplay.plugin_base.description": "合成一个插件底板",
+
+  "advancement.create_headsupdisplay.omni_core.title": "开始视奸数据ing...",
+  "advancement.create_headsupdisplay.omni_core.description": "合成一台数据集成核心",
+
+  "advancement.create_headsupdisplay.pro_upgrade_kit.title": "下一代显示技术",
+  "advancement.create_headsupdisplay.pro_upgrade_kit.description": "使用精密构件在序列组装中打造PRO升级套件",
+
+  "advancement.create_headsupdisplay.nbt_reader.title": "千磨万击还坚劲！",
+  "advancement.create_headsupdisplay.nbt_reader.description": "历经50次切割与冲压，从连接器中锤炼出NBT读取器",
+
+  "tooltip.create_headsupdisplay.nbt_reader.line1": "本是连接器，但是经过锤炼之后拥有了可以§5洞察万物§r的力量？！",
+  "tooltip.create_headsupdisplay.nbt_reader.line2": "§8» §7插件底板右键绑定，之后将其插入核心以建立稳定连接",
 
   "message.create_headsupdisplay.data_probe.bound": "数据读取器已绑定到位于 %s 的数据集成核心",
   "message.create_headsupdisplay.probe_recorded": "已记录读取器位置 %s，将其插入数据集成核心完成绑定",

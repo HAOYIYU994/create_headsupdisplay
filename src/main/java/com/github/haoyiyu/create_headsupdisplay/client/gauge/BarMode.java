@@ -32,7 +32,7 @@ public class BarMode implements IDisplayMode {
         BAR_FRAME = reg.register("bar_frame", img);
     }
     @Override
-    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h) {
+    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h, int color, int alpha) {
         float val = GaugeUtil.parseFloat(dataValues.get(0));
         float maxVal = config.getMax(); String unit = config.getUnit();
         float pct = Mth.clamp(maxVal>0?val/maxVal:0f,0f,1f);

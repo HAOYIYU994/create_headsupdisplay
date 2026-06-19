@@ -28,7 +28,7 @@ public class GyroMode implements IDisplayMode {
     @Override public List<ConfigParamDescriptor> getConfigParameters() { return List.of(); }
 
     @Override
-    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h) {
+    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h, int color, int alpha) {
         float rawPitch = GaugeUtil.parseFloat(dataValues.size()>0 ? dataValues.get(0) : "0");
         float rawRoll  = dataValues.size()>1 ? GaugeUtil.parseFloat(dataValues.get(1)) : 0;
         int cx = w/2, cy = h/2, r = Math.min(w,h)/2 - 6;

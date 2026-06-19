@@ -38,7 +38,7 @@ public class ChartMode implements IDisplayMode {
     }
 
     @Override
-    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h) {
+    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h, int color, int alpha) {
         float val = GaugeUtil.parseFloat(dataValues.get(0));
         float mx = config.getMax(), mn = config.getMin();
         int hs = config.getInt("historySize", 60), lc = config.getInt("lineColor", 0x00FF00);

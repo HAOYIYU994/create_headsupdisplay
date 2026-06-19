@@ -21,7 +21,7 @@ public class LEDMode implements IDisplayMode {
         return List.of(ConfigParamDescriptor.of("cols",ConfigParamType.INT,4), ConfigParamDescriptor.of("onColor",ConfigParamType.COLOR,0x00FF00), ConfigParamDescriptor.of("offColor",ConfigParamType.COLOR,0x333333), ConfigParamDescriptor.of("ledSize",ConfigParamType.INT,6));
     }
     @Override
-    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h) {
+    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h, int color, int alpha) {
         int cols=Mth.clamp(config.getInt("cols",4),1,12), on=config.getInt("onColor",0x00FF00), off=config.getInt("offColor",0x333333), sz=Mth.clamp(config.getInt("ledSize",6),3,16);
         int cnt=dataValues.size(), rows=(int)Math.ceil((double)cnt/cols), sx=sz*2+4, sy=sz*2+4;
         int stx=(w-cols*sx)/2+sz, sty=(h-rows*sy)/2+sz;

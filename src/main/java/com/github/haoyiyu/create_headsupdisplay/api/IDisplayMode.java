@@ -14,9 +14,9 @@ public interface IDisplayMode {
     boolean needsNumericData();
     int getDefaultWidth();
     int getDefaultHeight();
-    void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h);
+    void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h, int color, int alpha);
     default void renderPreview(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h) {
-        render(g, font, dataValues, config, w, h);
+        render(g, font, dataValues, config, w, h, 0xFFFFFF, 255);
     }
     default void registerTextures(TextureRegistrar reg) {}
     default List<ConfigParamDescriptor> getConfigParameters() {

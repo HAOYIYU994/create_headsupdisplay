@@ -143,6 +143,10 @@ public class CreateHeadsUpDisplay {
             if (isShiftHeld) {
                 event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.display_terminal_pro.line1"));
                 event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.display_terminal_pro.line2"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.display_terminal_pro.line3"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.display_terminal_pro.line4"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.display_terminal_pro.line5"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.display_terminal_pro.line6"));
             } else {
                 event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.hold_shift",
                         Component.keybind("key.sneak")));
@@ -158,6 +162,21 @@ public class CreateHeadsUpDisplay {
             if (isShiftHeld) {
                 event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.radar_plugin.line1"));
                 event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.radar_plugin.line2"));
+            } else {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.hold_shift",
+                        Component.keybind("key.sneak")));
+            }
+        } else if (stack.is(ModItems.PRO_UPGRADE_KIT.get())) {
+            if (isShiftHeld) {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.pro_upgrade_kit.line1"));
+            } else {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.hold_shift",
+                        Component.keybind("key.sneak")));
+            }
+        } else if (stack.is(ModItems.NBT_READER_ITEM.get())) {
+            if (isShiftHeld) {
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.nbt_reader.line1"));
+                event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.nbt_reader.line2"));
             } else {
                 event.getToolTip().add(Component.translatable("tooltip.create_headsupdisplay.hold_shift",
                         Component.keybind("key.sneak")));

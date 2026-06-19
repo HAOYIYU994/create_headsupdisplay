@@ -64,6 +64,8 @@ public class DisplayStylePanel {
     }
     public void hide(){visible=false;editingField=-1;}
     public boolean isVisible(){return visible;}
+    public int getPanelX() { return panelX; }
+    public int getPanelY() { return panelY; }
     private IDisplayMode getMode(){return hoveredModeIdx>=0&&hoveredModeIdx<allModes.size()?allModes.get(hoveredModeIdx):null;}
 
     private String fmt(DisplayModeConfig c,ConfigParamDescriptor p){return switch(p.type()){

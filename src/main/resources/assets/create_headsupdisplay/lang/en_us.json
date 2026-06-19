@@ -93,11 +93,12 @@
   "tooltip.create_headsupdisplay.display_terminal.line5": "§8» §7Alpha (opacity) slider is inside the color editor panel",
   "tooltip.create_headsupdisplay.display_terminal.line6": "§8» §7Image alpha: click the A:xxx% button on image to adjust",
 
-  "tooltip.create_headsupdisplay.display_terminal_pro.line1": "§8» §7Drag source cards from dock to canvas, supports layers and overlay",
-  "tooltip.create_headsupdisplay.display_terminal_pro.line2": "§8» §7Click color swatch to open HSV color picker with alpha slider",
-  "tooltip.create_headsupdisplay.display_terminal_pro.line3": "§8» §7Right-click layer in panel for Rename and Freeze options",
-  "tooltip.create_headsupdisplay.display_terminal_pro.line4": "§8» §7Save button packs all layers and slots into one payload",
-  "tooltip.create_headsupdisplay.display_terminal_pro.line5": "§8» §7Double-click static text on canvas to edit inline",
+  "tooltip.create_headsupdisplay.display_terminal_pro.line1": "§8» §7Redefining industrial-grade data visualization. The ultimate display terminal beyond imagination.",
+  "tooltip.create_headsupdisplay.display_terminal_pro.line2": "§8» §7Multi-layer overlay · 11 dynamic gauges · HSV precision color · Millisecond response",
+  "tooltip.create_headsupdisplay.display_terminal_pro.line3": "§8» §7Built-in §5animation engine§7. Keyframe-driven. Every frame of data becomes a work of art.",
+  "tooltip.create_headsupdisplay.display_terminal_pro.line4": "§8» §7Frozen anchor · Radar awareness · Chart analytics · XYZ coordinate tracking",
+  "tooltip.create_headsupdisplay.display_terminal_pro.line5": "§8» §7Crafted with the Pro-exclusive upgrade kit. The pinnacle of engineering aesthetics.",
+  "tooltip.create_headsupdisplay.display_terminal_pro.line6": "§8» §5@2026 — See the Future",
 
   "gui.create_headsupdisplay.pro.display_style": "Display Style",
   "gui.create_headsupdisplay.pro.display_mode.text": "Text",
@@ -181,6 +182,25 @@
   "gui.create_headsupdisplay.pro.tool_delete.tip": "Delete",
   "gui.create_headsupdisplay.pro.tool_save": "💾",
   "gui.create_headsupdisplay.pro.tool_save.tip": "Save",
+  "gui.create_headsupdisplay.pro.tool_settings": "Settings",
+
+  "gui.create_headsupdisplay.pro.settings.title": "Pro Settings",
+  "gui.create_headsupdisplay.pro.settings.menu_bar_default": "Menu bar default",
+  "gui.create_headsupdisplay.pro.settings.dock_default": "Dock default",
+  "gui.create_headsupdisplay.pro.settings.image_zoom_preview": "Image zoom preview",
+  "gui.create_headsupdisplay.pro.settings.exit_behavior": "Exit behavior",
+  "gui.create_headsupdisplay.pro.settings.ui_theme": "UI Theme",
+  "gui.create_headsupdisplay.pro.settings.open": "Open",
+  "gui.create_headsupdisplay.pro.settings.closed": "Closed",
+  "gui.create_headsupdisplay.pro.settings.normal": "Normal",
+  "gui.create_headsupdisplay.pro.settings.fixed": "Fixed",
+  "gui.create_headsupdisplay.pro.settings.exit_dont_save": "Don't save",
+  "gui.create_headsupdisplay.pro.settings.exit_save": "Save",
+  "gui.create_headsupdisplay.pro.settings.exit_ask": "Ask",
+  "gui.create_headsupdisplay.pro.settings.dark": "Dark",
+  "gui.create_headsupdisplay.pro.settings.light": "Light",
+  "gui.create_headsupdisplay.pro.exit_cancel": "Cancel",
+  "gui.create_headsupdisplay.pro.settings.restart_hint": "* Changes take effect after restarting the terminal",
 
   "tooltip.create_headsupdisplay.head_mount_display.line1": "§8» §7Allows you to view information from a linked Display Terminal",
   "tooltip.create_headsupdisplay.head_mount_display.line2": "§8» §7Right-click+shift on a Display Terminal to link",
@@ -250,6 +270,30 @@
   "item.create_headsupdisplay.nbt_reader": "NBT Reader",
   "block.create_headsupdisplay.fast_display_link": "Fast Display Link",
   "item.create_headsupdisplay.fast_display_link": "Fast Display Link",
+  "item.create_headsupdisplay.pro_upgrade_kit": "Display Terminal Pro Upgrade Kit @2026",
+
+  "tooltip.create_headsupdisplay.pro_upgrade_kit.line1": "§7Clearly not something that belongs in this era of brass and steam. No manual either — you'll have to figure it out yourself.",
+
+  "advancement.create_headsupdisplay.root.title": "Create: Heads Up Display",
+  "advancement.create_headsupdisplay.root.description": "Visualizing everything about data",
+
+  "advancement.create_headsupdisplay.display_terminal.title": "Display, So Easy!",
+  "advancement.create_headsupdisplay.display_terminal.description": "Craft a Display Terminal",
+
+  "advancement.create_headsupdisplay.plugin_base.title": "Expanding Functionality!",
+  "advancement.create_headsupdisplay.plugin_base.description": "Craft a Plugin Base",
+
+  "advancement.create_headsupdisplay.omni_core.title": "Data Snooping...",
+  "advancement.create_headsupdisplay.omni_core.description": "Craft a Data Integration Core",
+
+  "advancement.create_headsupdisplay.pro_upgrade_kit.title": "Next-Gen Display Technology",
+  "advancement.create_headsupdisplay.pro_upgrade_kit.description": "Craft the PRO Upgrade Kit through Sequenced Assembly",
+
+  "advancement.create_headsupdisplay.nbt_reader.title": "千磨万击还坚劲！",
+  "advancement.create_headsupdisplay.nbt_reader.description": "历经50次切割与冲压，从连接器中锤炼出NBT读取器",
+
+  "tooltip.create_headsupdisplay.nbt_reader.line1": "Originally a Link Block, but after tempering it gained the power to §5see through all things§r?!",
+  "tooltip.create_headsupdisplay.nbt_reader.line2": "§8» §7Right-click with Plugin Base to bind, then insert into OmniCore for a stable connection",
 
   "message.create_headsupdisplay.data_probe.bound": "Data Probe bound to Data Integration Core at %s",
   "message.create_headsupdisplay.probe_recorded": "Recorded probe at %s, insert into OmniCore to complete binding",

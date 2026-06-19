@@ -1,0 +1,33 @@
+{
+  "display": {
+    "title": {
+      "translate": "advancement.create_headsupdisplay.display_terminal.title"
+    },
+    "description": {
+      "translate": "advancement.create_headsupdisplay.display_terminal.description"
+    },
+    "icon": {
+      "id": "create_headsupdisplay:display_terminal"
+    },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "parent": "create_headsupdisplay:main/root",
+  "criteria": {
+    "has_display_terminal": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": {
+        "items": [
+          {
+            "items": "create_headsupdisplay:display_terminal"
+          }
+        ]
+      }
+    }
+  },
+  "requirements": [
+    ["has_display_terminal"]
+  ]
+}

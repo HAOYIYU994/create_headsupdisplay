@@ -1,0 +1,17 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "A",
+    "B",
+    "C"
+  ],
+  "key": {
+    "A": { "item": "create_headsupdisplay:pro_upgrade_kit" },
+    "B": { "item": "create_headsupdisplay:display_terminal" },
+    "C": { "item": "create:brass_casing" }
+  },
+  "result": {
+    "id": "create_headsupdisplay:display_terminal_pro",
+    "count": 1
+  }
+}

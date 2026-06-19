@@ -19,7 +19,7 @@ public class HudAltMode implements IDisplayMode {
     @Override public int getDefaultHeight() { return 140; }
     @Override public Component getDisplayName() { return Component.translatable("gui.create_headsupdisplay.pro.display_mode.hudalt"); }
     @Override
-    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h) {
+    public void render(GuiGraphics g, Font font, List<String> dataValues, DisplayModeConfig config, int w, int h, int color, int alpha) {
         float val=GaugeUtil.parseFloat(dataValues.get(0)), min=config.getMin(), max=config.getMax(); String u=config.getUnit();
         if (max<=min) max=min+100f; float range=max-min, half=range/2;
         float smin=val-half, smax=val+half;

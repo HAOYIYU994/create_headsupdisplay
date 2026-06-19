@@ -1,0 +1,76 @@
+{
+  "type": "create:sequenced_assembly",
+  "ingredient": {
+    "item": "create:precision_mechanism"
+  },
+  "loops": 1,
+  "results": [
+    {
+      "id": "create_headsupdisplay:pro_upgrade_kit"
+    }
+  ],
+  "sequence": [
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        { "item": "create_headsupdisplay:pro_upgrade_kit" },
+        { "item": "create:golden_sheet" }
+      ],
+      "results": [
+        { "id": "create_headsupdisplay:pro_upgrade_kit" }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        { "item": "create_headsupdisplay:pro_upgrade_kit" },
+        { "item": "create:transmitter" }
+      ],
+      "results": [
+        { "id": "create_headsupdisplay:pro_upgrade_kit" }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        { "item": "create_headsupdisplay:pro_upgrade_kit" },
+        { "item": "create:pulse_timer" }
+      ],
+      "results": [
+        { "id": "create_headsupdisplay:pro_upgrade_kit" }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        { "item": "create_headsupdisplay:pro_upgrade_kit" },
+        { "item": "create:powered_latch" }
+      ],
+      "results": [
+        { "id": "create_headsupdisplay:pro_upgrade_kit" }
+      ]
+    },
+    {
+      "type": "create:deploying",
+      "ingredients": [
+        { "item": "create_headsupdisplay:pro_upgrade_kit" },
+        { "item": "create:electron_tube" }
+      ],
+      "results": [
+        { "id": "create_headsupdisplay:pro_upgrade_kit" }
+      ]
+    },
+    {
+      "type": "create:pressing",
+      "ingredients": [
+        { "item": "create_headsupdisplay:pro_upgrade_kit" }
+      ],
+      "results": [
+        { "id": "create_headsupdisplay:pro_upgrade_kit" }
+      ]
+    }
+  ],
+  "transitional_item": {
+    "id": "create_headsupdisplay:pro_upgrade_kit"
+  }
+}

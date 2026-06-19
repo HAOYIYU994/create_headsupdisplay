@@ -31,6 +31,7 @@ public class ModCreativeTabs {
                         output.accept(ModItems.PLUGIN_BASE.get());
                         output.accept(ModItems.NBT_READER_ITEM.get());
                         output.accept(ModItems.FAST_DISPLAY_LINK_ITEM.get());
+                        output.accept(ModItems.PRO_UPGRADE_KIT.get());
                     })
                     .build()
     );

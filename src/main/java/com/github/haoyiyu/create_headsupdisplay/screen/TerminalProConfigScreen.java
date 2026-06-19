@@ -76,6 +76,21 @@ public class TerminalProConfigScreen extends Screen {
 
     // 动画时间
     private long animStartTime = 0;
+    // 缩放指示器
+    private long zoomIndicatorTime = 0;
+    private long scaleIndicatorTime = 0;
+    private static final long ZOOM_INDICATOR_DURATION = 1000;
+
+    // 设置面板
+    private boolean settingsVisible = false;
+    private int settingsX = 100, settingsY = 40;
+    private boolean settingsDragging = false;
+    private int settingsDragOffX, settingsDragOffY;
+    private static final int SETTINGS_W = 220;
+    private static final int SETTINGS_ROW_H = 22;
+
+    // 退出确认对话框
+    private boolean confirmExitVisible = false;
 
     // ====== 内部数据类 ======
     private static class SlotEntry implements DisplayStylePanel.ModeTarget {
@@ -287,6 +302,21 @@ public class TerminalProConfigScreen extends Screen {
             }
         }
 
+        // 恢复客户端 UI 状态（图层面板、调色板、当前图层）
+        ProTerminalUIState state = ProTerminalUIState.get();
+        state.load();
+        if (state.layerPanelVisible) layerPanel.show(state.layerPanelX, state.layerPanelY);
+        if (state.colorPickerVisible) colorPicker.show(state.colorPickerX, state.colorPickerY, 0xFFFFFF, 255);
+        if (state.currentLayer >= 0 && state.currentLayer < layers().size()) {
+            currentLayer = state.currentLayer;
+            layerPanel.setCurrentLayer(state.currentLayer);
+        }
+        if (state.canvasZoom > 0) canvasZoom = state.canvasZoom;
+        // 应用设置默认值
+        menuExpanded = state.menuBarDefaultOpen;
+        dockExpanded = state.dockDefaultOpen;
+        menuAnim = menuExpanded ? 1f : 0f;
+        dockAnim = dockExpanded ? 1f : 0f;
     }
 
     // ====== 生命周期 ======
@@ -297,13 +327,48 @@ public class TerminalProConfigScreen extends Screen {
     }
 
     @Override
+    public void onClose() {
+        // 退出行为：1=直接保存, 0=不保存（2=始终询问在 keyPressed 拦截）
+        ProTerminalUIState state = ProTerminalUIState.get();
+        if (state.exitBehavior == 1) {
+            saveAll();
+        }
+
+        // 保存客户端 UI 状态（不发往服务端）
+        state.layerPanelVisible = layerPanel.isVisible();
+        if (state.layerPanelVisible) {
+            state.layerPanelX = layerPanel.getPanelX();
+            state.layerPanelY = layerPanel.getPanelY();
+        }
+        state.colorPickerVisible = colorPicker.isVisible();
+        if (state.colorPickerVisible) {
+            state.colorPickerX = colorPicker.getPanelX();
+            state.colorPickerY = colorPicker.getPanelY();
+        }
+        state.stylePanelVisible = stylePanel.isVisible();
+        if (state.stylePanelVisible) {
+            state.stylePanelX = stylePanel.getPanelX();
+            state.stylePanelY = stylePanel.getPanelY();
+        }
+        state.animPanelVisible = animPanel.isVisible();
+        if (state.animPanelVisible) {
+            state.animPanelX = animPanel.getPanelX();
+            state.animPanelY = animPanel.getPanelY();
+        }
+        state.currentLayer = currentLayer;
+        state.canvasZoom = canvasZoom;
+        state.save();
+        super.onClose();
+    }
+
+    @Override
     public boolean isPauseScreen() { return false; }
 
     // ====== 主渲染 ======
     @Override
     public void render(GuiGraphics g, int mx, int my, float pt) {
         renderBackground(g, mx, my, pt); // 必须调用以初始化渲染管线
-        g.fill(0, 0, width, height, 0xFF101018);
+        g.fill(0, 0, width, height, isLight() ? 0xFFE0E0E8 : 0xFF101018);
 
         long elapsed = System.currentTimeMillis() - animStartTime;
         float targetMenu = menuExpanded ? 1f : 0f;
@@ -321,6 +386,9 @@ public class TerminalProConfigScreen extends Screen {
         renderCanvas(g, mx, my, canvasY, canvasH);
         renderMenuBar(g, mx, my, menuH);
         renderDock(g, mx, my, height - dockH, dockH);
+
+        // 强制提交画布内容，确保浮层面板能正确遮挡文字
+        g.flush();
 
         // 文本编辑提示
         if (textEditTarget != null) {
@@ -357,6 +425,37 @@ public class TerminalProConfigScreen extends Screen {
         colorPicker.render(g, font, mx, my);
         g.pose().popPose();
         if (!colorPicker.isVisible()) colorEditTarget = null;
+        if (settingsVisible) {
+            g.pose().pushPose();
+            g.pose().translate(0, 0, 250);
+            renderSettingsPanel(g, mx, my);
+            g.pose().popPose();
+        }
+        if (confirmExitVisible) {
+            g.pose().pushPose();
+            g.pose().translate(0, 0, 250);
+            renderConfirmExit(g, mx, my);
+            g.pose().popPose();
+        }
+
+        // 元素倍率指示器（滚轮缩放选中元素，1秒渐隐）
+        long sinceScale = System.currentTimeMillis() - scaleIndicatorTime;
+        if (sinceScale < ZOOM_INDICATOR_DURATION && selectedElement != null) {
+            float fade = sinceScale < 700 ? 1f : 1f - (sinceScale - 700f) / 300f;
+            String ss = String.format("%.0f%%", getElementScale(selectedElement) * 100);
+            int sw = font.width(ss);
+            int[] b = getElementBounds(selectedElement);
+            if (b != null) {
+                int lx = b[0];
+                int ty = b[1] - 10;
+                g.pose().pushPose();
+                g.pose().translate(lx, ty, 0);
+                g.pose().scale(0.8f, 0.8f, 1f);
+                g.fill(0, 0, sw + 8, 12, ((int)(0xCC * fade) << 24) | 0x222244);
+                g.drawString(font, ss, 4, 2, ((int)(0xFF * fade) << 24) | 0xCCCCFF);
+                g.pose().popPose();
+            }
+        }
 
         // NOTE: no super.render() — it causes background blur in 1.21.1
     }
@@ -365,43 +464,43 @@ public class TerminalProConfigScreen extends Screen {
     //  菜单栏
     // ================================================================
     private void renderMenuBar(GuiGraphics g, int mx, int my, int h) {
+        boolean lt = isLight();
         if (menuAnim < 0.3f) {
-            // 收起：只显示箭头，无背景条
             boolean hover = mx >= 2 && mx <= 16 && my >= 0 && my <= h;
-            int bg = hover ? 0xCC556688 : 0x88334455;
+            int bg = hover ? (lt ? 0xCC8899AA : 0xCC556688) : (lt ? 0x88AABBCC : 0x88334455);
             g.fill(2, 0, 16, h, bg);
-            g.drawString(font, "▼", 4, 0, 0xFFFFFFFF);
+            g.drawString(font, "▼", 4, 0, lt ? 0xFF222222 : 0xFFFFFFFF);
             return;
         }
 
         // 背景
-        g.fill(0, 0, width, h, 0xFF282840);
-        g.fill(0, h - 1, width, h, 0xFF5050AA);
+        g.fill(0, 0, width, h, lt ? 0xFFD0D0D8 : 0xFF282840);
+        g.fill(0, h - 1, width, h, lt ? 0xFFAAAAAA : 0xFF5050AA);
 
         int y = 4;
         int x = 4;
         boolean hoverCollapse = mx >= x && mx <= x + 18 && my >= 0 && my <= h;
-        g.fill(x, 0, x + 18, h, hoverCollapse ? 0xFF6677AA : 0xFF4A5080);
-        g.drawString(font, "▲", x + 3, y, 0xFFFFFFFF);
+        g.fill(x, 0, x + 18, h, hoverCollapse ? (lt ? 0xFFBBBBCC : 0xFF6677AA) : (lt ? 0xFFCCCCDD : 0xFF4A5080));
+        g.drawString(font, "▲", x + 3, y, lt ? 0xFF222222 : 0xFFFFFFFF);
         x += 22;
 
         // 图层选择
         String curLayerName = currentLayer < layers().size() ? layers().get(currentLayer).name : "Main";
-        g.drawString(font, Component.translatable("gui.create_headsupdisplay.pro.layer").getString() + ":", x, y + 1, 0xFFAAAAAA);
+        g.drawString(font, Component.translatable("gui.create_headsupdisplay.pro.layer").getString() + ":", x, y + 1, lt ? 0xFF555555 : 0xFFAAAAAA);
         x += 36;
         boolean hoverLayer = mx >= x && mx <= x + 70 && my >= y && my <= y + 14;
         int lw = Math.max(70, font.width(curLayerName) + 10);
-        g.fill(x, y - 1, x + lw, y + 15, hoverLayer ? 0xFF5A6AAA : 0xFF3A4A6A);
-        g.drawString(font, curLayerName, x + 3, y + 2, 0xFFFFFFFF);
-        g.drawString(font, "▾", x + lw - 14, y + 2, 0xFFCCCCCC);
+        g.fill(x, y - 1, x + lw, y + 15, hoverLayer ? (lt ? 0xFFBBCCDD : 0xFF5A6AAA) : (lt ? 0xFFD5D5DD : 0xFF3A4A6A));
+        g.drawString(font, curLayerName, x + 3, y + 2, lt ? 0xFF111111 : 0xFFFFFFFF);
+        g.drawString(font, "▾", x + lw - 14, y + 2, lt ? 0xFF666666 : 0xFFCCCCCC);
         x += lw + 4;
 
         // 分隔线
-        g.fill(x, 2, x + 1, h - 2, 0xFF6060BB);
+        g.fill(x, 2, x + 1, h - 2, lt ? 0xFFBBBBBB : 0xFF6060BB);
         x += 5;
 
         // 分隔线
-        g.fill(x, 2, x + 1, h - 2, 0xFF6060BB);
+        g.fill(x, 2, x + 1, h - 2, lt ? 0xFFBBBBBB : 0xFF6060BB);
         x += 5;
 
         // 工具按钮
@@ -416,6 +515,26 @@ public class TerminalProConfigScreen extends Screen {
         x += 4;
         // 保存
         x = drawToolBtn(g, mx, my, x, y, h, t("gui.create_headsupdisplay.pro.tool_save"), t("gui.create_headsupdisplay.pro.tool_save.tip"), 0xFF228822);
+
+        // 画布缩放指示器（gear 左边）
+        long sinceZoom = System.currentTimeMillis() - zoomIndicatorTime;
+        if (sinceZoom < ZOOM_INDICATOR_DURATION) {
+            float fade = sinceZoom < 700 ? 1f : 1f - (sinceZoom - 700f) / 300f;
+            String zs = String.format("%.0f%%", canvasZoom * 100);
+            int zw = font.width(zs);
+            int zx = width - zw - 10 - 24;
+            int zbBg = lt ? 0xFFD5D5DD : 0x222244;
+            int zbFg = lt ? 0xFF333388 : 0xCCCCFF;
+            g.fill(zx, 1, zx + zw + 8, h - 1, ((int)(0xCC * fade) << 24) | zbBg);
+            g.drawString(font, zs, zx + 4, y, ((int)(0xFF * fade) << 24) | zbFg);
+        }
+
+        // 设置按钮（右侧）
+        int gearW = 20;
+        int gearX = width - gearW - 4;
+        boolean gearHover = mx >= gearX && mx <= gearX + gearW && my >= 0 && my <= h;
+        g.fill(gearX, 1, gearX + gearW, h - 1, gearHover ? (lt ? 0xFFBBBBCC : 0xFF6677AA) : (lt ? 0xFFCCCCDD : 0xFF4A5080));
+        g.drawString(font, "⚙", gearX + 3, y, 0xFFFFCC44);
 
         // 右侧图层下拉（展开时）
         if (renameLayerMode) {
@@ -437,9 +556,11 @@ public class TerminalProConfigScreen extends Screen {
     private int drawToolBtn(GuiGraphics g, int mx, int my, int x, int y, int barH, String label, String tooltip, int color) {
         int w = btnW(label);
         boolean hover = mx >= x && mx <= x + w && my >= 0 && my <= barH;
+        // 白色主题下默认按钮改为浅色
+        if (isLight() && color == 0xFF3A4A6A) color = 0xFFCCCCDD;
         int bg = hover ? lighten(color) : color;
         g.fill(x, 1, x + w, barH - 1, bg);
-        g.drawString(font, label, x + 4, y, 0xFFFFFFFF);
+        g.drawString(font, label, x + 4, y, isLight() ? 0xFF111111 : 0xFFFFFFFF);
         return x + w + 2;
     }
 
@@ -535,14 +656,6 @@ public class TerminalProConfigScreen extends Screen {
 
         g.disableScissor();
         g.pose().popPose(); // 缩放
-
-        // 缩放指示器
-        if (canvasZoom != 1f) {
-            String z = String.format("%.0f%%", canvasZoom * 100);
-            int zw = font.width(z);
-            g.fill(width - zw - 10, canvasY + 4, width - 4, canvasY + 16, 0xCC222244);
-            g.drawString(font, z, width - zw - 6, canvasY + 6, 0xFFCCCCFF);
-        }
     }
 
     /** 图层叠加：visible=true 的图层全部渲染，但编辑只限选中图层 */
@@ -667,9 +780,11 @@ public class TerminalProConfigScreen extends Screen {
             int bw = iw, bh = ih;
 
             ResourceLocation tex = DynamicTextureCache.getOrCreate(e.imageId, e.imageData);
+            // 固定预览模式：统一0.2倍显示
+            float dispScale = ProTerminalUIState.get().imageScalePreview == 1 ? 0.2f : e.scale;
             g.pose().pushPose();
-            g.pose().translate(e.posX + bw * e.scale / 2f, e.posY + bh * e.scale / 2f, 0);
-            g.pose().scale(e.scale, e.scale, 1f);
+            g.pose().translate(e.posX + bw * dispScale / 2f, e.posY + bh * dispScale / 2f, 0);
+            g.pose().scale(dispScale, dispScale, 1f);
             g.pose().mulPose(com.mojang.math.Axis.ZP.rotationDegrees(e.rotation));
             g.pose().translate(-bw / 2f, -bh / 2f, 0);
 
@@ -774,22 +889,22 @@ public class TerminalProConfigScreen extends Screen {
     //  信息源坞
     // ================================================================
     private void renderDock(GuiGraphics g, int mx, int my, int dockY, int dockH) {
+        boolean lt = isLight();
         if (dockAnim < 0.2f) {
-            // 收起：只显示箭头
             boolean hover = mx >= 2 && mx <= 16 && my >= dockY && my <= dockY + dockH;
-            int bg = hover ? 0xCC556688 : 0x88334455;
+            int bg = hover ? (lt ? 0xCC8899AA : 0xCC556688) : (lt ? 0x88AABBCC : 0x88334455);
             g.fill(2, dockY, 16, dockY + dockH, bg);
-            g.drawString(font, "▲", 4, dockY, 0xFFFFFFFF);
+            g.drawString(font, "▲", 4, dockY, lt ? 0xFF222222 : 0xFFFFFFFF);
             return;
         }
 
-        g.fill(0, dockY, width, dockY + dockH, 0xFF282840);
-        g.fill(0, dockY, width, dockY + 1, 0xFF5050AA);
+        g.fill(0, dockY, width, dockY + dockH, lt ? 0xFFD0D0D8 : 0xFF282840);
+        g.fill(0, dockY, width, dockY + 1, lt ? 0xFFAAAAAA : 0xFF5050AA);
 
         int y = dockY + 2;
         boolean hoverToggle = mx >= 2 && mx <= 18 && my >= dockY && my <= dockY + 14;
-        g.fill(2, y, 18, y + 12, hoverToggle ? 0xFF6677AA : 0xFF4A5080);
-        g.drawString(font, "▼", 5, y + 1, 0xFFFFFFFF);
+        g.fill(2, y, 18, y + 12, hoverToggle ? (lt ? 0xFFBBBBCC : 0xFF6677AA) : (lt ? 0xFFCCCCDD : 0xFF4A5080));
+        g.drawString(font, "▼", 5, y + 1, lt ? 0xFF222222 : 0xFFFFFFFF);
 
         // 卡片列表（可横向滚动）
         int cardY = dockY + 16;
@@ -798,23 +913,23 @@ public class TerminalProConfigScreen extends Screen {
 
         if (sourceCards.isEmpty()) {
             String hint = t("gui.create_headsupdisplay.pro.dock_empty");
-            g.drawString(font, hint, 32, cardY + 8, 0xFF8888AA);
+            g.drawString(font, hint, 32, cardY + 8, lt ? 0xFF666677 : 0xFF8888AA);
         }
 
         for (SourceCard card : sourceCards) {
             int cx = startX;
             if (cx + CARD_W > 0 && cx < width) {
                 boolean hover = mx >= cx && mx <= cx + CARD_W && my >= cardY && my <= cardY + CARD_H;
-                int bgColor = card.type == 1 ? 0xFF553388 : (card.type == 2 ? 0xFF338833 : 0xFF3355AA);
+                int bgColor = lt ? (card.type == 1 ? 0xFFCCBBDD : (card.type == 2 ? 0xFFBBDDBB : 0xFFBBCCDD)) : (card.type == 1 ? 0xFF553388 : (card.type == 2 ? 0xFF338833 : 0xFF3355AA));
                 if (hover) bgColor = lighten(bgColor);
                 g.fill(cx, cardY, cx + CARD_W, cardY + CARD_H, bgColor);
-                g.fill(cx, cardY, cx + CARD_W, cardY + 1, 0xFF8888FF);
+                g.fill(cx, cardY, cx + CARD_W, cardY + 1, lt ? 0xFF8888CC : 0xFF8888FF);
                 String name = card.name.length() > 10 ? card.name.substring(0, 9) + "." : card.name;
-                g.drawString(font, name, cx + 4, cardY + 3, 0xFFFFFFFF);
+                g.drawString(font, name, cx + 4, cardY + 3, lt ? 0xFF111122 : 0xFFFFFFFF);
                 String val = card.value.length() > 12 ? card.value.substring(0, 11) + "." : card.value;
-                g.drawString(font, val, cx + 4, cardY + 18, 0xFFFFFFFF);
+                g.drawString(font, val, cx + 4, cardY + 18, lt ? 0xFF222244 : 0xFFFFFFFF);
                 String tag = card.type == 1 ? t("gui.create_headsupdisplay.pro.card_img") : (card.type == 2 ? t("gui.create_headsupdisplay.pro.card_rdr") : t("gui.create_headsupdisplay.pro.card_src"));
-                g.drawString(font, tag, cx + CARD_W - font.width(tag) - 4, cardY + CARD_H - 10, 0xFFCCCCCC);
+                g.drawString(font, tag, cx + CARD_W - font.width(tag) - 4, cardY + CARD_H - 10, lt ? 0xFF666666 : 0xFFCCCCCC);
                 // 删除按钮（右上）
                 int ddx = cx + CARD_W - 14, ddy = cardY;
                 boolean dhover = mx >= ddx && mx <= ddx + 12 && my >= ddy && my <= ddy + 10;
@@ -848,6 +963,8 @@ public class TerminalProConfigScreen extends Screen {
         if (stylePanel.isVisible() && stylePanel.mouseClicked(mx, my, button)) return true;
         if (animPanel.isVisible() && animPanel.mouseClicked(mx, my, button)) return true;
         if (colorPicker.isVisible() && colorPicker.mouseClicked(mx, my, button)) return true;
+        if (confirmExitVisible && handleConfirmExitClick(mx, my)) return true;
+        if (settingsVisible && handleSettingsClick(mx, my)) return true;
 
         // 菜单栏（展开和收起都能点）
         if (my <= menuH || (my >= 0 && my <= MENU_COLLAPSED && !menuExpanded)) {
@@ -994,6 +1111,16 @@ public class TerminalProConfigScreen extends Screen {
             return true;
         }
 
+        // Settings btn (right side gear)
+        int gearW = 20;
+        int gearX = width - gearW - 4;
+        if (mx >= gearX && mx <= gearX + gearW && my >= 0 && my <= menuH) {
+            playClick();
+            settingsVisible = !settingsVisible;
+            if (settingsVisible) { settingsX = width / 2 - SETTINGS_W / 2; settingsY = 40; }
+            return true;
+        }
+
         return false;
     }
 
@@ -1108,6 +1235,7 @@ public class TerminalProConfigScreen extends Screen {
         if (stylePanel.isVisible() && stylePanel.mouseDragged(mx, my)) return true;
         if (animPanel.isVisible() && animPanel.mouseDragged(mx, my)) return true;
         if (colorPicker.isVisible() && colorPicker.mouseDragged(mx, my)) return true;
+        if (settingsDragging) { settingsX = (int) mx - settingsDragOffX; settingsY = (int) my - settingsDragOffY; return true; }
 
         if (dragMode == 0) return false;
 
@@ -1160,6 +1288,7 @@ public class TerminalProConfigScreen extends Screen {
         stylePanel.mouseReleased();
         animPanel.mouseReleased();
         colorPicker.mouseReleased();
+        settingsDragging = false;
 
         if (dragMode == 4 && dockDragCard != null) {
             int mh = (int) Mth.lerp(menuAnim, MENU_COLLAPSED, MENU_HEIGHT);
@@ -1231,8 +1360,9 @@ public class TerminalProConfigScreen extends Screen {
 
         // Ctrl+滚轮 → 画布缩放
         if (Screen.hasControlDown()) {
-            canvasZoom = Mth.clamp(canvasZoom + (float)(sy * 0.1f), 0.25f, 1f);
+            canvasZoom = Mth.clamp(canvasZoom + (float)(sy * 0.1f), 0.01f, 1f);
             com.github.haoyiyu.create_headsupdisplay.config.ModConfig.CANVAS_ZOOM.set((double) canvasZoom);
+            zoomIndicatorTime = System.currentTimeMillis();
             return true;
         }
 
@@ -1241,6 +1371,7 @@ public class TerminalProConfigScreen extends Screen {
             float ds = (float) (sy > 0 ? 0.05f : -0.05f);
             float s = Mth.clamp(getElementScale(selectedElement) + ds, 0.1f, 5f);
             setElementScale(selectedElement, s);
+            scaleIndicatorTime = System.currentTimeMillis();
             return true;
         }
 
@@ -1279,6 +1410,16 @@ public class TerminalProConfigScreen extends Screen {
         if ((keyCode == 261 || keyCode == 259) && selectedElement != null && textEditTarget == null) {
             deleteElement(selectedElement);
             selectedElement = null;
+            return true;
+        }
+        // ESC 退出确认（始终询问模式）
+        if (keyCode == 256 && ProTerminalUIState.get().exitBehavior == 2) {
+            confirmExitVisible = true;
+            return true;
+        }
+        // ESC 关闭确认对话框
+        if (keyCode == 256 && confirmExitVisible) {
+            confirmExitVisible = false;
             return true;
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
@@ -1326,14 +1467,14 @@ public class TerminalProConfigScreen extends Screen {
     private Object hitTest(double mx, double my) {
         for (int i = radars.size() - 1; i >= 0; i--) {
             RadarEntry e = radars.get(i);
-            if (isElementShown(e.layerIndex)) {
+            if (isElementShown(e.layerIndex) && !isElementLocked(e.layerIndex)) {
                 int w = (int)(100 * e.scale), h = (int)(60 * e.scale);
                 if (mx >= e.posX && mx <= e.posX + w && my >= e.posY && my <= e.posY + h) return e;
             }
         }
         for (int i = images.size() - 1; i >= 0; i--) {
             ImageEntry e = images.get(i);
-            if (isElementShown(e.layerIndex)) {
+            if (isElementShown(e.layerIndex) && !isElementLocked(e.layerIndex)) {
                 int iw = DynamicTextureCache.getWidth(e.imageId);
                 int ih = DynamicTextureCache.getHeight(e.imageId);
                 if (iw <= 0) { iw = 100; ih = 60; }
@@ -1343,7 +1484,7 @@ public class TerminalProConfigScreen extends Screen {
         }
         for (int i = staticTexts.size() - 1; i >= 0; i--) {
             StaticTextEntry e = staticTexts.get(i);
-            if (isElementShown(e.layerIndex)) {
+            if (isElementShown(e.layerIndex) && !isElementLocked(e.layerIndex)) {
                 int bw = Math.max(60, font.width(e.text) + 16);
                 int w = (int)(bw * e.scale), h = (int)(20 * e.scale);
                 if (mx >= e.posX && mx <= e.posX + w && my >= e.posY && my <= e.posY + h) return e;
@@ -1351,7 +1492,7 @@ public class TerminalProConfigScreen extends Screen {
         }
         for (int i = allSlots.size() - 1; i >= 0; i--) {
             SlotEntry e = allSlots.get(i);
-            if (isElementShown(e.layerIndex)) {
+            if (isElementShown(e.layerIndex) && !isElementLocked(e.layerIndex)) {
                 int[] sd = slotDisplaySize(e);
                 int w = (int)(sd[0] * e.scale), h = (int)(sd[1] * e.scale);
                 if (mx >= e.posX && mx <= e.posX + w && my >= e.posY && my <= e.posY + h) return e;
@@ -1612,6 +1753,200 @@ public class TerminalProConfigScreen extends Screen {
             default -> new int[]{80, 20};  // fallback
         };
     }
+
+    // ====== 设置面板 ======
+
+    private void renderSettingsPanel(GuiGraphics g, int mx, int my) {
+        ProTerminalUIState s = ProTerminalUIState.get();
+        int rows = 5;
+        int hintH = 16;
+        int h = 18 + rows * SETTINGS_ROW_H + 4 + hintH + 4;
+        int x = settingsX, y = settingsY;
+
+        // 面板背景
+        int bg = s.uiTheme == 1 ? 0xFFD0D0D8 : 0xFF1A1A2E;
+        int border = s.uiTheme == 1 ? 0xFF999999 : 0xFF6060CC;
+        int titleBg = s.uiTheme == 1 ? 0xFFBEBECC : 0xFF2A2A4A;
+        int textColor = s.uiTheme == 1 ? 0xFF222222 : 0xFFCCCCCC;
+        int dimColor = s.uiTheme == 1 ? 0xFF777777 : 0xFF888888;
+        int onColor = s.uiTheme == 1 ? 0xFF559955 : 0xFF44AA44;
+        int offColor = s.uiTheme == 1 ? 0xFFAA7777 : 0xFF884444;
+
+        g.fill(x, y, x + SETTINGS_W, y + h, bg);
+        g.fill(x, y, x + SETTINGS_W, y + 1, border);
+
+        // 标题栏（与图层面板等高 12px）
+        int ty = y + 2;
+        g.fill(x + 2, ty, x + SETTINGS_W - 2, ty + 12, titleBg);
+        g.drawCenteredString(font, t("gui.create_headsupdisplay.pro.settings.title"), x + SETTINGS_W / 2, ty + 2, textColor);
+        int closeX = x + SETTINGS_W - 16;
+        boolean ch = mx >= closeX && mx <= closeX + 12 && my >= ty && my <= ty + 14;
+        g.fill(closeX, ty, closeX + 12, ty + 12, ch ? 0xFFFF4444 : 0xAA883333);
+        g.drawString(font, "X", closeX + 3, ty + 1, 0xFFFFFFFF);
+
+        int ry = y + 17;
+        for (int i = 0; i < rows; i++) {
+            boolean hover = mx >= x + 4 && mx <= x + SETTINGS_W - 4 && my >= ry && my <= ry + SETTINGS_ROW_H;
+            g.fill(x + 4, ry, x + SETTINGS_W - 4, ry + SETTINGS_ROW_H, hover ? 0x22FFFFFF : 0);
+            String label = "";
+            String value = "";
+            switch (i) {
+                case 0 -> { label = t("gui.create_headsupdisplay.pro.settings.menu_bar_default"); value = s.menuBarDefaultOpen ? t("gui.create_headsupdisplay.pro.settings.open") : t("gui.create_headsupdisplay.pro.settings.closed"); }
+                case 1 -> { label = t("gui.create_headsupdisplay.pro.settings.dock_default"); value = s.dockDefaultOpen ? t("gui.create_headsupdisplay.pro.settings.open") : t("gui.create_headsupdisplay.pro.settings.closed"); }
+                case 2 -> { label = t("gui.create_headsupdisplay.pro.settings.image_zoom_preview"); value = s.imageScalePreview == 0 ? t("gui.create_headsupdisplay.pro.settings.normal") : t("gui.create_headsupdisplay.pro.settings.fixed"); }
+                case 3 -> { label = t("gui.create_headsupdisplay.pro.settings.exit_behavior"); value = switch (s.exitBehavior) { case 0 -> t("gui.create_headsupdisplay.pro.settings.exit_dont_save"); case 1 -> t("gui.create_headsupdisplay.pro.settings.exit_save"); case 2 -> t("gui.create_headsupdisplay.pro.settings.exit_ask"); default -> "?"; }; }
+                case 4 -> { label = t("gui.create_headsupdisplay.pro.settings.ui_theme"); value = s.uiTheme == 0 ? t("gui.create_headsupdisplay.pro.settings.dark") : t("gui.create_headsupdisplay.pro.settings.light"); }
+            }
+            g.drawString(font, label, x + 8, ry + 5, textColor);
+            int vw = font.width(value) + 10;
+            int vx = x + SETTINGS_W - vw - 10;
+            boolean vh = mx >= vx && mx <= vx + vw && my >= ry && my <= ry + SETTINGS_ROW_H;
+            int vcol = (i == 0 && s.menuBarDefaultOpen) || (i == 1 && s.dockDefaultOpen) || (i == 2 && s.imageScalePreview == 0) || (i == 3 && s.exitBehavior == 0) || (i == 4 && s.uiTheme == 0) ? onColor : offColor;
+            if (vh) vcol = lighten(vcol);
+            g.fill(vx, ry + 2, vx + vw, ry + SETTINGS_ROW_H - 2, vcol);
+            g.drawString(font, value, vx + 4, ry + 5, 0xFFFFFFFF);
+            ry += SETTINGS_ROW_H;
+        }
+
+        // 底部提示
+        ry += 2;
+        g.fill(x + 4, ry, x + SETTINGS_W - 4, ry + 1, border & 0x44FFFFFF);
+        ry += 2;
+        g.drawString(font, t("gui.create_headsupdisplay.pro.settings.restart_hint"), x + 8, ry + 2, dimColor);
+    }
+
+    private boolean handleSettingsClick(double mx, double my) {
+        int rows = 5;
+        int hintH = 16;
+        int h = 18 + rows * SETTINGS_ROW_H + 4 + hintH + 4;
+        int x = settingsX, y = settingsY;
+
+        // 关闭按钮（12px 标题栏）
+        int ty = y + 2;
+        int closeX = x + SETTINGS_W - 16;
+        if (mx >= closeX && mx <= closeX + 12 && my >= ty && my <= ty + 12) {
+            settingsVisible = false;
+            ProTerminalUIState.get().save();
+            return true;
+        }
+
+        // 标题拖拽
+        if (mx >= x + 2 && mx <= x + SETTINGS_W - 18 && my >= ty && my <= ty + 12) {
+            settingsDragging = true;
+            settingsDragOffX = (int)(mx - x);
+            settingsDragOffY = (int)(my - y);
+            return true;
+        }
+
+        // 外部点击关闭
+        if (my < y || my > y + h || mx < x || mx > x + SETTINGS_W) {
+            settingsVisible = false;
+            ProTerminalUIState.get().save();
+            return true;
+        }
+
+        // 各行点击
+        ProTerminalUIState s = ProTerminalUIState.get();
+        int ry = y + 17;
+        for (int i = 0; i < rows; i++) {
+            if (mx >= x + 4 && mx <= x + SETTINGS_W - 4 && my >= ry && my <= ry + SETTINGS_ROW_H) {
+                playClick();
+                switch (i) {
+                    case 0 -> s.menuBarDefaultOpen = !s.menuBarDefaultOpen;
+                    case 1 -> s.dockDefaultOpen = !s.dockDefaultOpen;
+                    case 2 -> s.imageScalePreview = s.imageScalePreview == 0 ? 1 : 0;
+                    case 3 -> s.exitBehavior = (s.exitBehavior + 1) % 3;
+                    case 4 -> s.uiTheme = s.uiTheme == 0 ? 1 : 0;
+                }
+                return true;
+            }
+            ry += SETTINGS_ROW_H;
+        }
+        return true;
+    }
+
+    // ====== 退出确认对话框 ======
+
+    private void renderConfirmExit(GuiGraphics g, int mx, int my) {
+        ProTerminalUIState s = ProTerminalUIState.get();
+        int isLight = s.uiTheme == 1 ? 1 : 0;
+        int boxW = 200, boxH = 70;
+        int bx = width / 2 - boxW / 2, by = height / 2 - boxH / 2;
+
+        // 半透明遮罩
+        g.fill(0, 0, width, height, 0x88000000);
+
+        int bg = isLight == 1 ? 0xFFD5D5DD : 0xFF222233;
+        int border = isLight == 1 ? 0xFF999999 : 0xFF6060CC;
+        int textColor = isLight == 1 ? 0xFF222222 : 0xFFCCCCCC;
+
+        g.fill(bx, by, bx + boxW, by + boxH, bg);
+        g.fill(bx, by, bx + boxW, by + 1, border);
+
+        String title = t("gui.create_headsupdisplay.pro.settings.exit_behavior");
+        int tw = font.width(title);
+        g.drawString(font, title, bx + (boxW - tw) / 2, by + 8, textColor);
+
+        // 三个按钮: 保存并退出 | 不保存退出 | 取消
+        int btnY = by + 30, btnH = 22;
+        int gap = 6;
+        String s1 = t("gui.create_headsupdisplay.pro.settings.exit_save");
+        String s2 = t("gui.create_headsupdisplay.pro.settings.exit_dont_save");
+        String s3 = t("gui.create_headsupdisplay.pro.exit_cancel");
+        int w1 = font.width(s1) + 14, w2 = font.width(s2) + 14, w3 = font.width(s3) + 12;
+        int totalW = w1 + gap + w2 + gap + w3;
+        int sx = bx + (boxW - totalW) / 2;
+
+        int[] xs = {sx, sx + w1 + gap, sx + w1 + gap + w2 + gap};
+        int[] ws = {w1, w2, w3};
+        int[] colors = {0xFF44AA44, 0xFFAA6644, 0xFF666688};
+        int[] colorsLight = {0xFF55AA55, 0xFFCC8855, 0xFF9999AA};
+        String[] labels = {s1, s2, s3};
+
+        for (int i = 0; i < 3; i++) {
+            boolean hover = mx >= xs[i] && mx <= xs[i] + ws[i] && my >= btnY && my <= btnY + btnH;
+            int col = isLight == 1 ? colorsLight[i] : colors[i];
+            if (hover) col = lighten(col);
+            g.fill(xs[i], btnY, xs[i] + ws[i], btnY + btnH, col);
+            int lw = font.width(labels[i]);
+            g.drawString(font, labels[i], xs[i] + (ws[i] - lw) / 2, btnY + 5, 0xFFFFFFFF);
+        }
+    }
+
+    private boolean handleConfirmExitClick(double mx, double my) {
+        int boxW = 200, boxH = 70;
+        int bx = width / 2 - boxW / 2, by = height / 2 - boxH / 2;
+
+        // 遮罩区域外点击 = 取消
+        if (mx < bx || mx > bx + boxW || my < by || my > by + boxH) {
+            confirmExitVisible = false;
+            return true;
+        }
+
+        int btnY = by + 30, btnH = 22, gap = 6;
+        String s1 = t("gui.create_headsupdisplay.pro.settings.exit_save");
+        String s2 = t("gui.create_headsupdisplay.pro.settings.exit_dont_save");
+        String s3 = t("gui.create_headsupdisplay.pro.exit_cancel");
+        int w1 = font.width(s1) + 14, w2 = font.width(s2) + 14, w3 = font.width(s3) + 12;
+        int totalW = w1 + gap + w2 + gap + w3;
+        int sx = bx + (boxW - totalW) / 2;
+        int[] xs = {sx, sx + w1 + gap, sx + w1 + gap + w2 + gap};
+        int[] ws = {w1, w2, w3};
+
+        for (int i = 0; i < 3; i++) {
+            if (mx >= xs[i] && mx <= xs[i] + ws[i] && my >= btnY && my <= btnY + btnH) {
+                playClick();
+                confirmExitVisible = false;
+                if (i == 0) { saveAll(); minecraft.setScreen(null); }       // 保存并退出
+                else if (i == 1) { minecraft.setScreen(null); }             // 不保存退出
+                // i == 2: 取消，只关闭对话框
+                return true;
+            }
+        }
+        return true;
+    }
+
+    private boolean isLight() { return ProTerminalUIState.get().uiTheme == 1; }
 
     private boolean button(int b) { return b == 0; }
 
